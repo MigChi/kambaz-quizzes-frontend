@@ -3,7 +3,6 @@ import { FaCheckCircle } from "react-icons/fa";
 import { BiImport } from "react-icons/bi";
 import { LiaFileImportSolid } from "react-icons/lia";
 import { Button } from "react-bootstrap";
-{/* Find more icons */}
 import { BsFillHouseFill } from "react-icons/bs";
 import { BsFillBarChartFill } from "react-icons/bs";
 import { FaBullhorn } from "react-icons/fa";
