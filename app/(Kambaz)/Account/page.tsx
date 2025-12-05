@@ -1,17 +1,21 @@
-// app/(Kambaz)/Account/page.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useEffect } from "react";
+
 import { useSelector } from "react-redux";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { RootState } from "../Courses/[cid]/store";
 
 export default function AccountPage() {
-  const user = useSelector((s: RootState) => s.account.currentUser);
+  const { currentUser } = useSelector((state: any) => state.accountReducer);
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(user ? "/Account/Profile" : "/Account/Signin");
-  }, [user, router]);
+    if (currentUser) {
+      router.replace("/Account/Profile");
+    } else {
+      router.replace("/Account/Signin");
+    }
+  }, [currentUser, router]);
 
   return null;
 }

@@ -1,45 +1,48 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from "axios";
-import type { Assignment } from "../store/assignmentsSlice";
-import { HTTP_SERVER } from "../../../Account/client";
 
+const HTTP_SERVER = process.env.NEXT_PUBLIC_HTTP_SERVER;
 const COURSES_API = `${HTTP_SERVER}/api/courses`;
 const ASSIGNMENTS_API = `${HTTP_SERVER}/api/assignments`;
 
-export const findAssignmentsForCourse = async (
-  courseId: string
-): Promise<Assignment[]> => {
-  const { data } = await axios.get<Assignment[]>(
-    `${COURSES_API}/${courseId}/assignments`,
-    { withCredentials: true }
+// Get all assignments for a course
+export const findAssignmentsForCourse = async (courseId: string) => {
+  const { data } = await axios.get(
+    `${COURSES_API}/${courseId}/assignments`
   );
   return data;
 };
 
-export const createAssignmentForCourse = async (
-  courseId: string,
-  assignment: Pick<Assignment, "title" | "points" | "dueDate">
-): Promise<Assignment> => {
-  const { data } = await axios.post<Assignment>(
-    `${COURSES_API}/${courseId}/assignments`,
-    assignment,
-    { withCredentials: true }
+// Get single assignment (not strictly required by your current UI, but useful)
+export const findAssignmentById = async (assignmentId: string) => {
+  const { data } = await axios.get(
+    `${ASSIGNMENTS_API}/${assignmentId}`
   );
   return data;
 };
 
-export const deleteAssignment = async (assignmentId: string): Promise<void> => {
-  await axios.delete(`${ASSIGNMENTS_API}/${assignmentId}`, {
-    withCredentials: true,
-  });
+// Create an assignment for a course
+export const createAssignment = async (courseId: string, assignment: any) => {
+  const { data } = await axios.post(
+    `${COURSES_API}/${courseId}/assignments`,
+    assignment
+  );
+  return data;
 };
 
-export const updateAssignment = async (
-  assignment: Assignment
-): Promise<Assignment> => {
-  const { data } = await axios.put<Assignment>(
+// Update an assignment
+export const updateAssignment = async (assignment: any) => {
+  const { data } = await axios.put(
     `${ASSIGNMENTS_API}/${assignment._id}`,
-    assignment,
-    { withCredentials: true }
+    assignment
+  );
+  return data;
+};
+
+// Delete an assignment
+export const deleteAssignment = async (assignmentId: string) => {
+  const { data } = await axios.delete(
+    `${ASSIGNMENTS_API}/${assignmentId}`
   );
   return data;
 };

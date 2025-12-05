@@ -1,58 +1,40 @@
-// app/(Kambaz)/Courses/[cid]/Home/Status.tsx
-"use client";
-import { Button, ButtonGroup, ListGroup } from "react-bootstrap";
-import {
-  FaBan, FaCheck, FaUpload, FaLayerGroup,
-  FaHome, FaEye, FaBullhorn, FaChartBar, FaBell
-} from "react-icons/fa";
+import { MdDoNotDisturbAlt } from "react-icons/md";
+import { FaCheckCircle } from "react-icons/fa";
+import { BiImport } from "react-icons/bi";
+import { LiaFileImportSolid } from "react-icons/lia";
+import { Button } from "react-bootstrap";
+{/* Find more icons */}
+import { BsFillHouseFill } from "react-icons/bs";
+import { BsFillBarChartFill } from "react-icons/bs";
+import { FaBullhorn } from "react-icons/fa";
+import { FaBell } from "react-icons/fa";
 
 export default function CourseStatus() {
-  return (
-    <section id="wd-course-status">
-      <h4 className="mb-3">Course Status</h4>
-
-      {/* publish/unpublish row */}
-      <ButtonGroup className="w-100 mb-3">
-        <Button
-          id="wd-unpublish-btn"
-          variant="secondary"
-          className="d-flex align-items-center justify-content-center"
-        >
-          <FaBan className="me-2" /> Unpublish
-        </Button>
-        <Button
-          id="wd-publish-btn"
-          variant="success"
-          className="d-flex align-items-center justify-content-center"
-        >
-          <FaCheck className="me-2" /> Publish
-        </Button>
-      </ButtonGroup>
-
-      {/* actions list */}
-      <ListGroup className="rounded-0">
-        <ListGroup.Item action id="wd-import-existing-content"  className="d-flex align-items-center">
-          <FaUpload className="me-2" /> Import Existing Content
-        </ListGroup.Item>
-        <ListGroup.Item action id="wd-import-from-commons"      className="d-flex align-items-center">
-          <FaLayerGroup className="me-2" /> Import from Commons
-        </ListGroup.Item>
-        <ListGroup.Item action id="wd-choose-home-page"         className="d-flex align-items-center">
-          <FaHome className="me-2" /> Choose Home Page
-        </ListGroup.Item>
-        <ListGroup.Item action id="wd-view-course-screen"       className="d-flex align-items-center">
-          <FaEye className="me-2" /> View Course Screen
-        </ListGroup.Item>
-        <ListGroup.Item action id="wd-new-announcement"         className="d-flex align-items-center">
-          <FaBullhorn className="me-2" /> New Announcement
-        </ListGroup.Item>
-        <ListGroup.Item action id="wd-new-analytics"            className="d-flex align-items-center">
-          <FaChartBar className="me-2" /> New Analytics
-        </ListGroup.Item>
-        <ListGroup.Item action id="wd-view-course-notifications" className="d-flex align-items-center">
-          <FaBell className="me-2" /> View Course Notifications
-        </ListGroup.Item>
-      </ListGroup>
-    </section>
-  );
-}
+ return (
+   <div id="wd-course-status" style={{ width: "350px" }}>
+     <h2>Course Status</h2>
+     <div className="d-flex">
+       <div className="w-50 pe-1">
+         <Button variant="secondary" size="lg" className="w-100 text-nowrap ">
+           <MdDoNotDisturbAlt className="me-2 fs-5" /> Unpublish </Button> </div>
+       <div className="w-50">
+         <Button variant="success" size="lg" className="w-100">
+           <FaCheckCircle className="me-2 fs-5" /> Publish </Button> </div>
+     </div>
+     <br />
+     <Button variant="secondary" size="lg" className="w-100 mt-1 text-start">
+       <BiImport className="me-2 fs-5" /> Import Existing Content </Button>
+     <Button variant="secondary" size="lg" className="w-100 mt-1 text-start">
+       <LiaFileImportSolid className="me-2 fs-5" /> Import from Commons </Button>
+     {/* Complete the rest of the buttons */}
+     <Button variant="secondary" size="lg" className="w-100 mt-1 text-start">
+       <BsFillHouseFill className="me-2 fs-5" /> Choose Home Page </Button>     
+     <Button variant="secondary" size="lg" className="w-100 mt-1 text-start">
+       <BsFillBarChartFill className="me-2 fs-5" /> View Course Screen </Button>   
+     <Button variant="secondary" size="lg" className="w-100 mt-1 text-start">
+       <FaBullhorn className="me-2 fs-5" /> New Announcement </Button>    
+     <Button variant="secondary" size="lg" className="w-100 mt-1 text-start">
+       <BsFillBarChartFill className="me-2 fs-5" /> New Analytics </Button>       
+     <Button variant="secondary" size="lg" className="w-100 mt-1 text-start">
+       <FaBell className="me-2 fs-5" /> View Course Notifications </Button>    
+   </div> );}

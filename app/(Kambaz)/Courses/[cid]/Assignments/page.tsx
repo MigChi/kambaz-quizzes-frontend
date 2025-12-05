@@ -1,108 +1,107 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect } from "react";
+import { ListGroup, ListGroupItem, Button } from "react-bootstrap";
+import AssignmentControls from "./AssignmentControls";
+import AssignmentsSectionButtons from "./AssignmentsSectionButtons";
+import AssignmentControlButtons from "./AssignmentControlButtons";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { BsGripVertical, BsJournalText, BsCaretDownFill, BsTrash } from "react-icons/bs";
+import { useParams } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
-import type { AppDispatch, RootState } from "../store";
 import {
-  addAssignment,
-  deleteAssignment,
+  deleteAssignment as deleteAssignmentReducer,
+  updateAssignment as updateAssignmentReducer,
+  addAssignment as addAssignmentReducer,
   setAssignments,
-} from "../store/assignmentsSlice";
-import { ListGroup } from "react-bootstrap";
-import * as assignmentsClient from "./client";
+} from "./reducer";
+import * as client from "./client";
+import { useEffect } from "react";
 
-export default function AssignmentsPage() {
+const ordinal = (n: number) => {
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+
+const prettyDate = (iso?: string, timeLabel?: string) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const month = d.toLocaleString("en-US", { month: "long" });
+  const day = ordinal(d.getDate());
+  return `${month} ${day}${timeLabel ? ` at ${timeLabel}` : ""}`;
+};
+
+export default function Assignments() {
   const { cid } = useParams<{ cid: string }>();
-  const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useDispatch();
+  const { assignments } = useSelector((s: any) => s.assignmentsReducer);
+  const { currentUser } = useSelector((s: any) => s.accountReducer);
+  const isFaculty = currentUser?.role === "FACULTY" || currentUser?.role === "ADMIN";
 
-  const user = useSelector((s: RootState) => s.account.currentUser);
-  const isFaculty = (user?.role ?? "").toUpperCase() === "FACULTY";
-
-  // After we switch to server-backed assignments, the slice already
-  // contains the assignments for this course, so we don't need to filter.
-  const assignments = useSelector(
-    (s: RootState) => s.assignments.assignments
-  );
-
-  // Load assignments for this course from the server
   useEffect(() => {
     const load = async () => {
-      if (!cid) return;
-      const data = await assignmentsClient.findAssignmentsForCourse(cid);
-      dispatch(setAssignments(data));
+      const serverAssignments = await client.findAssignmentsForCourse(cid);
+      dispatch(setAssignments(serverAssignments));
     };
-    void load();
-  }, [cid, dispatch]);
+    load();
+  }, [cid]);
 
-  const handleAdd = async () => {
-    if (!cid) return;
+  const courseAssignments = assignments.filter((a: any) => a.course === cid);
 
-    const newAssignment = await assignmentsClient.createAssignmentForCourse(
-      cid,
-      {
-        title: "New Assignment",
-        points: 100,
-        // simple default due date: today
-        dueDate: new Date().toISOString().slice(0, 10),
-      }
-    );
-
-    dispatch(addAssignment(newAssignment));
-    router.push(`/Courses/${cid}/Assignments/${newAssignment._id}`);
-  };
-
-  const handleDelete = async (id: string) => {
-    await assignmentsClient.deleteAssignment(id);
-    dispatch(deleteAssignment(id));
+  const onDeleteAssignment = async (assignmentId: string) => {
+    await client.deleteAssignment(assignmentId);
+    dispatch(setAssignments(assignments.filter((a: any) => a._id !== assignmentId)));
   };
 
   return (
     <div id="wd-assignments">
-      <div className="d-flex justify-content-between align-items-center">
-        <h3 className="m-0">Assignments</h3>
-        {isFaculty && (
-          <button
-            id="wd-add-assignment-btn"
-            className="btn btn-danger"
-            onClick={handleAdd}
-          >
-            + Assignment
-          </button>
-        )}
-      </div>
-      <hr />
+      {isFaculty && <AssignmentControls />}
 
-      <ListGroup id="wd-assignments-list" className="rounded-0">
-        {assignments.map((a) => (
-          <ListGroup.Item
-            key={a._id}
-            className="d-flex justify-content-between align-items-center"
-          >
-            <Link
-              href={`/Courses/${cid}/Assignments/${a._id}`}
-              className="text-decoration-none"
-            >
-              {a.title}
-            </Link>
+      <br />
+      <ListGroup className="rounded-0" id="wd-assignments-list">
+        <ListGroupItem className="wd-assignments p-0 mb-5 fs-5 border-gray">
+          <div className="wd-title p-3 ps-2 bg-secondary">
+            <BsGripVertical className="me-2 fs-3" />
+            <BsCaretDownFill />
+            <b>ASSIGNMENTS</b>
+            <AssignmentsSectionButtons />
+          </div>
 
-            {isFaculty && (
-              <button
-                id="wd-delete-assignment"
-                className="btn btn-outline-danger btn-sm"
-                onClick={() => handleDelete(a._id)}
-              >
-              Delete
-              </button>
-            )}
-          </ListGroup.Item>
-        ))}
+          <ListGroup className="wd-lessons rounded-0">
+            {courseAssignments.map((assignment: any) => (
+              <ListGroupItem key={assignment._id} className="wd-assignment p-3 ps-1">
+                <div className="row align-items-center g-2">
+                  <div className="col-auto">
+                    <BsGripVertical className="fs-4" />
+                    <BsJournalText />
+                  </div>
 
-        {assignments.length === 0 && (
-          <div className="text-muted p-3">No assignments yet.</div>
-        )}
+                  <div className="col">
+                    <Link href={`/Courses/${cid}/Assignments/${assignment._id}`}
+                      className="fw-semibold text-dark text-decoration-none">
+                      {assignment.title}
+                    </Link>
+
+                    <div className="small text-muted mt-1">
+                      <b>Due</b> {prettyDate(assignment.dueDate, "11:59pm")} | {assignment.points} pts
+                    </div>
+                  </div>
+
+                  {isFaculty && (
+                    <Button
+                      variant="outline-danger"
+                      size="sm"
+                      title="Delete assignment"
+                      onClick={() => onDeleteAssignment(assignment._id)}
+                    >
+                      <BsTrash />
+                    </Button>
+                  )}
+                </div>
+              </ListGroupItem>
+            ))}
+          </ListGroup>
+        </ListGroupItem>
       </ListGroup>
     </div>
   );

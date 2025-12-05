@@ -1,45 +1,48 @@
-'use client';
+"use client";
 
 import Link from "next/link";
-import { usePathname, useParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
-type CourseNavLink = {
-  id: string;
-  label: string;
-  href: (cid: string) => string;
+const links = [
+  "Home",
+  "Modules",
+  "Piazza",
+  "Zoom",
+  "Assignments",
+  "Quizzes",
+  "Grades",
+  "People",
+] as const;
+
+const ROUTE_OVERRIDES: Record<string, string> = {
 };
 
-const LINKS: CourseNavLink[] = [
-  { id: "wd-course-home-link",        label: "Home",        href: (cid) => `/Courses/${cid}/Home` },
-  { id: "wd-course-modules-link",     label: "Modules",     href: (cid) => `/Courses/${cid}/Modules` },
-  { id: "wd-course-piazza-link",      label: "Piazza",      href: (cid) => `/Courses/${cid}/Piazza` },
-  { id: "wd-course-zoom-link",        label: "Zoom",        href: (cid) => `/Courses/${cid}/Zoom` },
-  { id: "wd-course-assignments-link", label: "Assignments", href: (cid) => `/Courses/${cid}/Assignments` },
-  { id: "wd-course-quizzes-link",     label: "Quizzes",     href: (cid) => `/Courses/${cid}/Quizzes` },
-  { id: "wd-course-people-link",      label: "People",      href: (cid) => `/Courses/${cid}/People/Table` },
-  { id: "wd-course-labs-link",        label: "Labs",        href: () => `/Labs` },
-];
-
-export default function CourseNavigation(props: { cid?: string }) {
-  const pathname = usePathname() ?? "";
-  const params = useParams() as { cid?: string };
-  const cid = props.cid ?? params?.cid ?? "1234";
+export default function CourseNavigation({ cid }: { cid: string }) {
+  const pathname = usePathname();
 
   return (
     <div id="wd-courses-navigation" className="wd list-group fs-5 rounded-0">
-      {LINKS.map((link) => {
-        const href = link.href(cid);
-        const isActive = pathname.startsWith(href);
-        const classes = `list-group-item border-0 ${isActive ? "active" : "text-danger"}`;
+      {links.map((label) => {
+        // For People, subpath will just be "People"
+        const subpath = ROUTE_OVERRIDES[label] ?? label;
+        const href = `/Courses/${cid}/${subpath}`;
+        const isActive = pathname?.startsWith(href);
+
         return (
-          <div key={link.id}>
-            <Link href={href} id={link.id} className={classes}>
-              {link.label}
-            </Link>
-            <br />
-          </div>
+          <Link
+            key={label}
+            href={href}
+            id={`wd-course-${label.toLowerCase()}-link`}
+            className={`list-group-item border-0 ${
+              isActive ? "active" : "text-danger"
+            }`}
+            aria-current={isActive ? "page" : undefined}
+          >
+            {label}
+          </Link>
         );
       })}
     </div>
   );
 }
+

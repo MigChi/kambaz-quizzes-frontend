@@ -1,170 +1,263 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import Link from "next/link";
+import { Form, Row, Col, InputGroup, Button } from "react-bootstrap";
 import { useParams, useRouter } from "next/navigation";
+import { BsCalendar3 } from "react-icons/bs";
 import { useDispatch, useSelector } from "react-redux";
-import type { AppDispatch, RootState } from "../../store";
-import { updateAssignment, deleteAssignment } from "../../store/assignmentsSlice";
-import { Form, Row, Col, Card } from "react-bootstrap";
-import { useMemo, useState } from "react";
-import * as assignmentsClient from "../client"; // ⬅️ NEW: HTTP client
+import { useEffect, useMemo, useState } from "react";
+import { setAssignments } from "../reducer";
+import * as client from "../client";
 
-function titleCase(s: string) {
-  return s.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-function computeDefaults(aid: string) {
-  const lower = (aid || "").toLowerCase();
-  const quizMatch = lower.match(/^quiz[-_]?(\d+)$/);
-  if (quizMatch) return { name: `Q${quizMatch[1]} — Quiz`, group: "QUIZZES", points: 20 };
-  if (lower === "midterm" || lower === "final")
-    return { name: `${titleCase(lower)} — Exam`, group: "EXAMS", points: 200 };
-  return { name: titleCase(lower || "Assignment"), group: "ASSIGNMENTS", points: 100 };
-}
+type FormState = {
+  _id?: string;
+  title: string;
+  description: string;
+  points: number;
+  dueDate?: string | null;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+  course: string;
+};
 
 export default function AssignmentEditor() {
-  const { cid, aid } = (useParams() as { cid?: string; aid?: string });
   const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
+  const { cid, aid } = useParams<{ cid: string; aid: string }>();
+  const { assignments } = useSelector((s: any) => s.assignmentsReducer);
+  const { currentUser } = useSelector((s: any) => s.accountReducer);
+  const dispatch = useDispatch();
 
-  const user = useSelector((s: RootState) => s.account.currentUser);
-  const isFaculty = (user?.role ?? "").toUpperCase() === "FACULTY";
+  const isNew = aid === "new";
+  const isFaculty =
+    currentUser?.role === "FACULTY" || currentUser?.role === "ADMIN";
+  const readOnly = !isFaculty;
 
-  const assignment = useSelector((s: RootState) =>
-    s.assignments.assignments.find((a) => a._id === aid && a.course === cid)
+  const existing = useMemo(
+    () => assignments.find((a: any) => a._id === aid),
+    [assignments, aid]
   );
 
-  const defaults = useMemo(() => computeDefaults(aid ?? ""), [aid]);
+  const [form, setForm] = useState<FormState>({
+    _id: existing?._id,
+    title: existing?.title ?? "",
+    description: existing?.description ?? "",
+    points: existing?.points ?? 100,
+    dueDate: existing?.dueDate ?? null,
+    availableFrom: existing?.availableFrom ?? null,
+    availableUntil: existing?.availableUntil ?? null,
+    course: cid,
+  });
 
-  const [title, setTitle] = useState<string>(assignment?.title ?? defaults.name);
-  const [points, setPoints] = useState<number>(assignment?.points ?? defaults.points);
-  const [group, setGroup] = useState<string>(defaults.group);
-  const [submission, setSubmission] = useState<string>("ONLINE");
-
-  if (!isFaculty) {
-    return (
-      <div id="wd-assignments-editor" className="p-3">
-        <h1 className="h4 mb-3">{assignment?.title ?? defaults.name}</h1>
-        <p className="text-muted">Only faculty can edit assignments.</p>
-        <Link href={`/Courses/${cid}/Assignments`} className="btn btn-secondary">
-          Back to Assignments
-        </Link>
-      </div>
-    );
-  }
-
-  const onSave = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    if (!aid || !cid) return;
-
-    // Persist to server
-    const updated = await assignmentsClient.updateAssignment({
-      _id: aid,
+  useEffect(() => {
+    if (!isNew && !existing) {
+      router.push(`/Courses/${cid}/Assignments`);
+      return;
+    }
+    setForm({
+      _id: existing?._id,
+      title: existing?.title ?? "",
+      description: existing?.description ?? "",
+      points: existing?.points ?? 100,
+      dueDate: existing?.dueDate ?? null,
+      availableFrom: existing?.availableFrom ?? null,
+      availableUntil: existing?.availableUntil ?? null,
       course: cid,
-      title,
-      points,
-      // group & submission are UI-only for now; add to type + backend if you want to persist them
     });
+  }, [existing, cid, isNew, router]);
 
-    // Keep Redux in sync
-    dispatch(updateAssignment(updated));
+  const onSave = async () => {
+    if (readOnly) return;
+
+    const payload = {
+      ...form,
+      points: Number(form.points) || 0,
+    };
+
+    if (isNew) {
+      await client.createAssignment(cid, payload);
+    } else {
+      await client.updateAssignment(payload);
+    }
+
+    // Reload assignments after save
+    const serverAssignments = await client.findAssignmentsForCourse(cid);
+    dispatch(setAssignments(serverAssignments));
+
     router.push(`/Courses/${cid}/Assignments`);
   };
 
-  const onDelete = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    if (!aid || !cid) return;
-
-    // Delete on server
-    await assignmentsClient.deleteAssignment(aid);
-
-    // Update Redux
-    dispatch(deleteAssignment(aid));
+  const onCancel = () => {
     router.push(`/Courses/${cid}/Assignments`);
   };
 
   return (
-    <div id="wd-assignments-editor">
-      <h1 className="h4 mb-3">{title}</h1>
+    <div
+      id="wd-assignments-editor"
+      style={{ maxWidth: 550 }}
+      className="mx-auto"
+    >
       <Form>
-        <Row className="g-3">
-          <Col md={8}>
-            <Card className="p-3">
-              <Form.Group className="mb-3">
-                <Form.Label>Assignment Name</Form.Label>
-                <Form.Control
-                  id="wd-assignment-name"
-                  value={title}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setTitle(e.target.value)
-                  }
-                />
-              </Form.Group>
+        {/* Assignment Title */}
+        <Form.Label htmlFor="wd-name" as="h2" className="fw-bold mb-2">
+          {isNew ? "New Assignment" : form.title || "Assignment"}
+        </Form.Label>
+        <Form.Control
+          id="wd-name"
+          className="mb-4"
+          value={form.title}
+          disabled={readOnly}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
+        />
 
-              <Form.Group className="mb-3">
-                <Form.Label>Points</Form.Label>
-                <Form.Control
-                  id="wd-assignment-points"
-                  type="number"
-                  value={Number.isFinite(points) ? String(points) : ""}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setPoints(Number(e.target.value || 0))
-                  }
-                />
-              </Form.Group>
+        {/* Description */}
+        <Form.Control
+          id="wd-description"
+          as="textarea"
+          rows={9}
+          className="mb-4"
+          value={form.description}
+          disabled={readOnly}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+        />
 
-              <div className="d-flex gap-2 flex-wrap">
-                <button id="wd-assignment-save" className="btn btn-danger" onClick={onSave}>
-                  Save
-                </button>
-                <Link href={`/Courses/${cid}/Assignments`} className="btn btn-secondary">
-                  Cancel
-                </Link>
-                <button
-                  id="wd-delete-assignment"
-                  className="btn btn-outline-danger ms-auto"
-                  onClick={onDelete}
-                >
-                  Delete
-                </button>
-              </div>
-            </Card>
+        {/* Points */}
+        <Row className="align-items-end mb-3">
+          <Col sm={4} className="text-sm-end fw-semibold">
+            <Form.Label htmlFor="wd-points">Points</Form.Label>
           </Col>
+          <Col sm={8}>
+            <Form.Control
+              id="wd-points"
+              type="number"
+              value={form.points}
+              disabled={readOnly}
+              onChange={(e) =>
+                setForm({ ...form, points: Number(e.target.value) })
+              }
+              style={{ maxWidth: 180 }}
+            />
+          </Col>
+        </Row>
 
-          <Col md={4}>
-            <div className="d-flex flex-column gap-3">
-              <Card className="p-3">
-                <div className="fw-semibold mb-2">Assignment Group</div>
-                <Form.Select
-                  id="wd-assignment-group"
-                  value={group}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                    setGroup(e.target.value)
-                  }
-                >
-                  <option>ASSIGNMENTS</option>
-                  <option>QUIZZES</option>
-                  <option>EXAMS</option>
-                  <option>PROJECT</option>
-                </Form.Select>
-              </Card>
+        {/* Assignment Group */}
+        <Row className="align-items-end mb-3">
+          <Col sm={4} className="text-sm-end fw-semibold">
+            <Form.Label>Assignment Group</Form.Label>
+          </Col>
+          <Col sm={8}>
+            <Form.Select
+              defaultValue="ASSIGNMENTS"
+              style={{ maxWidth: 260 }}
+              disabled
+            >
+              <option value="ASSIGNMENTS">ASSIGNMENTS</option>
+            </Form.Select>
+          </Col>
+        </Row>
 
-              <Card className="p-3">
-                <div className="fw-semibold mb-2">Submission Type</div>
-                <Form.Select
-                  id="wd-submission-type"
-                  value={submission}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                    setSubmission(e.target.value)
-                  }
-                >
-                  <option>ONLINE</option>
-                  <option>ON PAPER</option>
-                  <option>EXTERNAL TOOL</option>
-                </Form.Select>
-              </Card>
+        {/* Display Grade As */}
+        <Row className="align-items-end mb-3">
+          <Col sm={4} className="text-sm-end fw-semibold">
+            <Form.Label>Display Grade As</Form.Label>
+          </Col>
+          <Col sm={8}>
+            <Form.Select
+              defaultValue="PERCENT"
+              style={{ maxWidth: 260 }}
+              disabled
+            >
+              <option value="PERCENT">Percentage</option>
+            </Form.Select>
+          </Col>
+        </Row>
+
+        {/* Assign To + Dates */}
+        <Row className="mb-4">
+          <Col sm={4} className="text-sm-end fw-semibold">
+            <Form.Label>Assign</Form.Label>
+          </Col>
+          <Col sm={8}>
+            <div className="border rounded p-3">
+              <Form.Group className="mb-3">
+                <Form.Label>Assign to</Form.Label>
+                <Form.Control defaultValue="Everyone" disabled />
+              </Form.Group>
+
+              {/* Due Date */}
+              <div className="mb-3" style={{ maxWidth: 300 }}>
+                <Form.Label>Due</Form.Label>
+                <InputGroup>
+                  <Form.Control
+                    type="date"
+                    value={form.dueDate ?? ""}
+                    disabled={readOnly}
+                    onChange={(e) =>
+                      setForm({ ...form, dueDate: e.target.value || null })
+                    }
+                  />
+                  <InputGroup.Text>
+                    <BsCalendar3 />
+                  </InputGroup.Text>
+                </InputGroup>
+              </div>
+
+              {/* Available From / Until */}
+              <Row className="g-3">
+                <Col md={6}>
+                  <Form.Label>Available From</Form.Label>
+                  <InputGroup>
+                    <Form.Control
+                      type="date"
+                      value={form.availableFrom ?? ""}
+                      disabled={readOnly}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          availableFrom: e.target.value || null,
+                        })
+                      }
+                    />
+                    <InputGroup.Text>
+                      <BsCalendar3 />
+                    </InputGroup.Text>
+                  </InputGroup>
+                </Col>
+
+                <Col md={6}>
+                  <Form.Label>Until</Form.Label>
+                  <InputGroup>
+                    <Form.Control
+                      type="date"
+                      value={form.availableUntil ?? ""}
+                      disabled={readOnly}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          availableUntil: e.target.value || null,
+                        })
+                      }
+                    />
+                    <InputGroup.Text>
+                      <BsCalendar3 />
+                    </InputGroup.Text>
+                  </InputGroup>
+                </Col>
+              </Row>
             </div>
           </Col>
         </Row>
+
+        {/* Buttons */}
+        <div className="d-flex justify-content-end gap-2">
+          <Button variant="light" onClick={onCancel}>
+            Cancel
+          </Button>
+          {!readOnly && (
+            <Button variant="danger" onClick={onSave} id="wd-save-assignment">
+              Save
+            </Button>
+          )}
+        </div>
       </Form>
     </div>
   );

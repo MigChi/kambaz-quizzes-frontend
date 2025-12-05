@@ -81,36 +81,237 @@
     "_id": "M201",
     "name": "Fundamentals of Aerodynamics",
     "description": "Basic aerodynamic concepts and fluid dynamics principles.",
-    "course": "RS102"
+    "course": "RS102",
+    "lessons": [
+      { "_id": "L2011", "name": "Intro to Aerodynamics", "description": "Key terms, forces, and reference frames.", "module": "M201" },
+      { "_id": "L2012", "name": "Fluid Statics & Dynamics", "description": "Continuity and Bernoulli equations.", "module": "M201" },
+      { "_id": "L2013", "name": "Lift and Drag Basics", "description": "Pressure, shear, coefficients, and Reynolds number.", "module": "M201" }
+    ]
   },
   {
     "_id": "M202",
     "name": "Subsonic and Supersonic Flow",
     "description": "Understanding subsonic and supersonic aerodynamic behaviors.",
-    "course": "RS102"
+    "course": "RS102",
+    "lessons": [
+      { "_id": "L2021", "name": "Subsonic Flow Concepts", "description": "Incompressible assumptions and boundary layers.", "module": "M202" },
+      { "_id": "L2022", "name": "Compressible Flow & Mach", "description": "Mach number effects and area–velocity relation.", "module": "M202" },
+      { "_id": "L2023", "name": "Shock Waves & Expansions", "description": "Normal shocks and Prandtl–Meyer expansions.", "module": "M202" }
+    ]
   },
   {
     "_id": "M203",
     "name": "Aerodynamic Heating",
     "description": "Study of aerodynamic heating and thermal protection systems.",
-    "course": "RS102"
+    "course": "RS102",
+    "lessons": [
+      { "_id": "L2031", "name": "Convective Heating", "description": "Stagnation point heating and correlations.", "module": "M203" },
+      { "_id": "L2032", "name": "Thermal Protection Basics", "description": "TPS materials and design tradeoffs.", "module": "M203" },
+      { "_id": "L2033", "name": "High-Speed Effects", "description": "Re-entry heating and ablation overview.", "module": "M203" }
+    ]
   },
+
   {
     "_id": "M301",
     "name": "Spacecraft Structural Design",
     "description": "Fundamentals of designing spacecraft structures and materials selection.",
-    "course": "RS103"
+    "course": "RS103",
+    "lessons": [
+      { "_id": "L3011", "name": "Loads & Margins", "description": "Launch loads, safety factors, and margins.", "module": "M301" },
+      { "_id": "L3012", "name": "Materials for Space", "description": "Aluminum, composites, fatigue and creep.", "module": "M301" },
+      { "_id": "L3013", "name": "Primary Structure", "description": "Bus, panels, mounting, and fasteners.", "module": "M301" }
+    ]
   },
   {
     "_id": "M302",
     "name": "Orbital Mechanics",
     "description": "Understanding orbital dynamics and mission planning.",
-    "course": "RS103"
+    "course": "RS103",
+    "lessons": [
+      { "_id": "L3021", "name": "Two-Body Problem", "description": "Keplerian elements and conics.", "module": "M302" },
+      { "_id": "L3022", "name": "Transfers & ΔV", "description": "Hohmann transfers and plane changes.", "module": "M302" },
+      { "_id": "L3023", "name": "Mission Design Basics", "description": "Phasing, windows, and constraints.", "module": "M302" }
+    ]
   },
   {
     "_id": "M303",
     "name": "Spacecraft Systems Engineering",
     "description": "Overview of spacecraft systems and subsystems engineering.",
-    "course": "RS103"
+    "course": "RS103",
+    "lessons": [
+      { "_id": "L3031", "name": "Subsystems Overview", "description": "ADCS, power, comms, thermal, propulsion.", "module": "M303" },
+      { "_id": "L3032", "name": "Requirements & V&V", "description": "Flows, traceability, and test plans.", "module": "M303" },
+      { "_id": "L3033", "name": "Interfaces & Integration", "description": "ICDs, AIT flow, and risk management.", "module": "M303" }
+    ]
+  },
+
+  {
+    "_id": "M401",
+    "name": "Structure & Bonding in Organics",
+    "description": "Hybridization, resonance, and functional groups.",
+    "course": "RS104",
+    "lessons": [
+      { "_id": "L4011", "name": "Hybridization & Geometry", "description": "sp, sp2, sp3 and VSEPR.", "module": "M401" },
+      { "_id": "L4012", "name": "Resonance & Aromaticity", "description": "Stability and Huckel’s rule.", "module": "M401" },
+      { "_id": "L4013", "name": "Functional Groups", "description": "Alcohols, halides, carbonyls, amines.", "module": "M401" }
+    ]
+  },
+  {
+    "_id": "M402",
+    "name": "Stereochemistry & Mechanisms",
+    "description": "Chirality, conformations, and reaction mechanisms.",
+    "course": "RS104",
+    "lessons": [
+      { "_id": "L4021", "name": "Chirality & Isomerism", "description": "R/S, E/Z, diastereomers.", "module": "M402" },
+      { "_id": "L4022", "name": "Conformations", "description": "Newman projections and cyclohexane.", "module": "M402" },
+      { "_id": "L4023", "name": "SN1/SN2/E1/E2", "description": "Kinetics, conditions, and products.", "module": "M402" }
+    ]
+  },
+  {
+    "_id": "M403",
+    "name": "Spectroscopy & Synthesis",
+    "description": "IR, NMR, MS and multistep synthesis planning.",
+    "course": "RS104",
+    "lessons": [
+      { "_id": "L4031", "name": "IR & MS Basics", "description": "Key peaks and fragmentation.", "module": "M403" },
+      { "_id": "L4032", "name": "1H/13C NMR", "description": "Chemical shift, splitting, integration.", "module": "M403" },
+      { "_id": "L4033", "name": "Synthesis Strategy", "description": "Retrosynthesis and protecting groups.", "module": "M403" }
+    ]
+  },
+
+  {
+    "_id": "M501",
+    "name": "Coordination Chemistry",
+    "description": "Complexes, ligands, and bonding theories.",
+    "course": "RS105",
+    "lessons": [
+      { "_id": "L5011", "name": "Complex Nomenclature", "description": "Oxidation states and denticity.", "module": "M501" },
+      { "_id": "L5012", "name": "Crystal Field Theory", "description": "Δo, Δt, spin states.", "module": "M501" },
+      { "_id": "L5013", "name": "Ligand Field Effects", "description": "Spectrochemical series.", "module": "M501" }
+    ]
+  },
+  {
+    "_id": "M502",
+    "name": "Main Group Chemistry",
+    "description": "Trends and reactivity across the periodic table.",
+    "course": "RS105",
+    "lessons": [
+      { "_id": "L5021", "name": "Periodic Trends", "description": "IE, EN, size, and bonding.", "module": "M502" },
+      { "_id": "L5022", "name": "Halides & Oxides", "description": "Preparation and reactions.", "module": "M502" },
+      { "_id": "L5023", "name": "Acids & Bases", "description": "Lewis vs Brønsted, HSAB.", "module": "M502" }
+    ]
+  },
+  {
+    "_id": "M503",
+    "name": "Organometallics & Catalysis",
+    "description": "Metal–carbon bonds and catalytic cycles.",
+    "course": "RS105",
+    "lessons": [
+      { "_id": "L5031", "name": "Bonding & 18-Electron Rule", "description": "Hapticity and electron counting.", "module": "M503" },
+      { "_id": "L5032", "name": "Key Reactions", "description": "Oxidative addition, insertion, reductive elimination.", "module": "M503" },
+      { "_id": "L5033", "name": "Catalysis Cases", "description": "Hydrogenation and cross-coupling.", "module": "M503" }
+    ]
+  },
+
+  {
+    "_id": "M601",
+    "name": "Thermodynamics",
+    "description": "Energy, equilibrium, and spontaneity.",
+    "course": "RS106",
+    "lessons": [
+      { "_id": "L6011", "name": "Laws of Thermodynamics", "description": "Zeroth to Third laws.", "module": "M601" },
+      { "_id": "L6012", "name": "State Functions", "description": "Enthalpy, entropy, Gibbs energy.", "module": "M601" },
+      { "_id": "L6013", "name": "Phase Equilibria", "description": "Phase diagrams and Clapeyron.", "module": "M601" }
+    ]
+  },
+  {
+    "_id": "M602",
+    "name": "Chemical Kinetics",
+    "description": "Rates, mechanisms, and catalysis.",
+    "course": "RS106",
+    "lessons": [
+      { "_id": "L6021", "name": "Rate Laws", "description": "Orders, half-life, and Arrhenius.", "module": "M602" },
+      { "_id": "L6022", "name": "Mechanisms", "description": "Steady-state and pre-equilibrium.", "module": "M602" },
+      { "_id": "L6023", "name": "Catalysis", "description": "Hetero/homogeneous catalysts.", "module": "M602" }
+    ]
+  },
+  {
+    "_id": "M603",
+    "name": "Quantum & Spectroscopy",
+    "description": "Quantum foundations and molecular spectroscopy.",
+    "course": "RS106",
+    "lessons": [
+      { "_id": "L6031", "name": "Quantum Postulates", "description": "Operators and eigenvalues.", "module": "M603" },
+      { "_id": "L6032", "name": "Particle in a Box", "description": "Quantization and selection rules.", "module": "M603" },
+      { "_id": "L6033", "name": "Molecular Spectra", "description": "Rotational, vibrational, electronic.", "module": "M603" }
+    ]
+  },
+
+  {
+    "_id": "M701",
+    "name": "Elvish Linguistics",
+    "description": "Phonology and grammar of Sindarin and Quenya.",
+    "course": "RS107",
+    "lessons": [
+      { "_id": "L7011", "name": "Phonetics & Writing", "description": "Tengwar and pronunciation.", "module": "M701" },
+      { "_id": "L7012", "name": "Morphology", "description": "Nouns, verbs, and inflection.", "module": "M701" },
+      { "_id": "L7013", "name": "Syntax & Semantics", "description": "Sentence structure and meaning.", "module": "M701" }
+    ]
+  },
+  {
+    "_id": "M702",
+    "name": "Dwarvish & Black Speech",
+    "description": "Khuzdul structure and the Black Speech.",
+    "course": "RS107",
+    "lessons": [
+      { "_id": "L7021", "name": "Khuzdul Basics", "description": "Roots and triliterals.", "module": "M702" },
+      { "_id": "L7022", "name": "Runes & Inscriptions", "description": "Cirth writing system.", "module": "M702" },
+      { "_id": "L7023", "name": "Black Speech", "description": "Morphology and usage.", "module": "M702" }
+    ]
+  },
+  {
+    "_id": "M703",
+    "name": "Philology of Middle-earth",
+    "description": "Texts, inscriptions, and historical context.",
+    "course": "RS107",
+    "lessons": [
+      { "_id": "L7031", "name": "Primary Sources", "description": "Scrolls, songs, and lore.", "module": "M703" },
+      { "_id": "L7032", "name": "Comparative Linguistics", "description": "Language families and change.", "module": "M703" },
+      { "_id": "L7033", "name": "Translation Workshop", "description": "Render texts across tongues.", "module": "M703" }
+    ]
+  },
+
+  {
+    "_id": "M801",
+    "name": "Foundations of Diplomacy",
+    "description": "Principles of inter-species relations in Middle-earth.",
+    "course": "RS108",
+    "lessons": [
+      { "_id": "L8011", "name": "Power & Legitimacy", "description": "Councils, kings, and orders.", "module": "M801" },
+      { "_id": "L8012", "name": "Customs & Protocol", "description": "Etiquette among realms.", "module": "M801" },
+      { "_id": "L8013", "name": "Mediation Tactics", "description": "Consensus and compromise.", "module": "M801" }
+    ]
+  },
+  {
+    "_id": "M802",
+    "name": "Alliances & Treaties",
+    "description": "Historic alliances and treaty frameworks.",
+    "course": "RS108",
+    "lessons": [
+      { "_id": "L8021", "name": "Council of Elrond", "description": "Case study of multilateral decisions.", "module": "M802" },
+      { "_id": "L8022", "name": "Dwarves & Elves", "description": "Trust, trade, and tension.", "module": "M802" },
+      { "_id": "L8023", "name": "Men & Elves", "description": "Shared destiny and oaths.", "module": "M802" }
+    ]
+  },
+  {
+    "_id": "M803",
+    "name": "Conflict & Resolution",
+    "description": "Managing conflict and sustaining peace.",
+    "course": "RS108",
+    "lessons": [
+      { "_id": "L8031", "name": "Root Causes", "description": "Resources, borders, and belief.", "module": "M803" },
+      { "_id": "L8032", "name": "Negotiation Simulation", "description": "Role-play between realms.", "module": "M803" },
+      { "_id": "L8033", "name": "Post-Conflict Orders", "description": "Reconstruction and accords.", "module": "M803" }
+    ]
   }
 ]

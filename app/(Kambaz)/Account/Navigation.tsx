@@ -1,41 +1,45 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ListGroup } from "react-bootstrap";
 import { useSelector } from "react-redux";
-import type { RootState } from "../Courses/[cid]/store";
 
 export default function AccountNavigation() {
-  const pathname = (usePathname() ?? "").toLowerCase();
-  const user = useSelector((s: RootState) => s.account.currentUser);
+  const { currentUser } = useSelector((state: any) => state.accountReducer);
+  const pathname = usePathname();
 
-  const links = user
-    ? [
-        { label: "Profile", href: "/Account/Profile", id: "wd-account-profile-link" },
-      ]
-    : [
-        { label: "Sign In", href: "/Account/Signin", id: "wd-account-signin-link" },
-        { label: "Sign Up", href: "/Account/Signup", id: "wd-account-signup-link" },
-      ];
+  // Base links
+  let links: string[];
+
+  if (!currentUser) {
+    // Not logged in
+    links = ["Signin", "Signup"];
+  } else {
+    // Logged in
+    links = ["Profile"];
+    // Only admins get the Users link
+    if (currentUser.role === "ADMIN") {
+      links.push("Users");
+    }
+  }
 
   return (
-    <div id="wd-account-navigation" style={{ width: 220 }}>
-      <ListGroup className="rounded-0">
-        {links.map((l) => {
-          const active = pathname.startsWith(l.href.toLowerCase());
-          return (
-            <Link
-              key={l.href}
-              id={l.id}
-              href={l.href}
-              className={`list-group-item list-group-item-action border-0 rounded-0
-                ${active ? "text-danger fw-bold bg-white" : "text-danger bg-transparent"}`}
-            >
-              {l.label}
-            </Link>
-          );
-        })}
-      </ListGroup>
+    <div id="wd-account-navigation" className="wd list-group fs-5 rounded-0">
+      {links.map((link) => {
+        const active = pathname.toLowerCase().endsWith(link.toLowerCase());
+        return (
+          <Link
+            key={link}
+            href={link} // "Profile" -> /Account/Profile, "Users" -> /Account/Users
+            id={`wd-${link.toLowerCase()}-link`}
+            className={`list-group-item border-0 ${
+              active ? "active" : "text-danger"
+            }`}
+          >
+            {link}
+          </Link>
+        );
+      })}
     </div>
   );
 }

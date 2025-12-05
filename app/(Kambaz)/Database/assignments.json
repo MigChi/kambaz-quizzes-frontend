@@ -1,11 +1,250 @@
 [
-  { "_id": "A101", "title": "Propulsion Assignment",  "course": "RS101" },
-  { "_id": "A102", "title": "Combustion Analysis",    "course": "RS101" },
-  { "_id": "A103", "title": "Nozzle Design Project",  "course": "RS101" },
-  { "_id": "A201", "title": "Aerodynamics Quiz",      "course": "RS102" },
-  { "_id": "A202", "title": "Flow Analysis",          "course": "RS102" },
-  { "_id": "A203", "title": "Heating Analysis",       "course": "RS102" },
-  { "_id": "A301", "title": "Structural Design Task", "course": "RS103" },
-  { "_id": "A302", "title": "Orbital Calculations",   "course": "RS103" },
-  { "_id": "A303", "title": "Systems Engineering Exam","course": "RS103" }
+  {
+    "_id": "A101",
+    "title": "Propulsion Assignment",
+    "course": "RS101",
+    "description": "Analyze ideal rocket equation scenarios and report specific impulse comparisons.",
+    "points": 100,
+    "dueDate": "2023-02-20",
+    "availableFrom": "2023-02-01",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A102",
+    "title": "Combustion Analysis",
+    "course": "RS101",
+    "description": "Evaluate combustion chamber pressures and mixture ratios for given propellants.",
+    "points": 120,
+    "dueDate": "2023-03-10",
+    "availableFrom": "2023-02-20",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A103",
+    "title": "Nozzle Design Project",
+    "course": "RS101",
+    "description": "Design a de Laval nozzle and estimate performance across altitude profiles.",
+    "points": 150,
+    "dueDate": "2023-04-15",
+    "availableFrom": "2023-03-15",
+    "availableUntil": "2023-05-15"
+  },
+
+  {
+    "_id": "A201",
+    "title": "Aerodynamics Quiz",
+    "course": "RS102",
+    "description": "Short-answer quiz on basic aerodynamic forces and coefficients.",
+    "points": 50,
+    "dueDate": "2023-02-28",
+    "availableFrom": "2023-02-07",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A202",
+    "title": "Flow Analysis",
+    "course": "RS102",
+    "description": "Compute lift and drag for airfoils under subsonic conditions using given data.",
+    "points": 100,
+    "dueDate": "2023-03-25",
+    "availableFrom": "2023-03-04",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A203",
+    "title": "Heating Analysis",
+    "course": "RS102",
+    "description": "Estimate aerodynamic heating for a blunt body and propose TPS choices.",
+    "points": 110,
+    "dueDate": "2023-04-20",
+    "availableFrom": "2023-03-30",
+    "availableUntil": "2023-05-15"
+  },
+
+  {
+    "_id": "A301",
+    "title": "Structural Design Task",
+    "course": "RS103",
+    "description": "Size a primary spacecraft panel to meet load and margin requirements.",
+    "points": 120,
+    "dueDate": "2023-03-05",
+    "availableFrom": "2023-02-12",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A302",
+    "title": "Orbital Calculations",
+    "course": "RS103",
+    "description": "Calculate transfer ΔV, period, and phasing for a two-burn mission.",
+    "points": 130,
+    "dueDate": "2023-03-30",
+    "availableFrom": "2023-03-09",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A303",
+    "title": "Systems Engineering Exam",
+    "course": "RS103",
+    "description": "Closed-book exam on requirements, V&V, and interface control concepts.",
+    "points": 200,
+    "dueDate": "2023-05-05",
+    "availableFrom": "2023-04-14",
+    "availableUntil": "2023-05-15"
+  },
+
+  {
+    "_id": "A401",
+    "title": "Guidance Systems Lab",
+    "course": "RS104",
+    "description": "Implement a basic PID controller and characterize response to step inputs.",
+    "points": 80,
+    "dueDate": "2023-03-12",
+    "availableFrom": "2023-02-19",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A402",
+    "title": "Attitude Control Simulation",
+    "course": "RS104",
+    "description": "Simulate rigid body attitude dynamics with external torques in MATLAB/Python.",
+    "points": 100,
+    "dueDate": "2023-04-02",
+    "availableFrom": "2023-03-12",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A403",
+    "title": "Telemetry Packet Parser",
+    "course": "RS104",
+    "description": "Parse and validate telemetry frames; produce a decoded CSV and brief report.",
+    "points": 90,
+    "dueDate": "2023-04-22",
+    "availableFrom": "2023-04-01",
+    "availableUntil": "2023-05-15"
+  },
+
+  {
+    "_id": "A501",
+    "title": "Materials Fatigue Report",
+    "course": "RS105",
+    "description": "Analyze fatigue life under variable loading; include S–N curve discussion.",
+    "points": 100,
+    "dueDate": "2023-03-18",
+    "availableFrom": "2023-02-25",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A502",
+    "title": "Vibration Test Plan",
+    "course": "RS105",
+    "description": "Draft a vibration test plan with input spectra and acceptance criteria.",
+    "points": 90,
+    "dueDate": "2023-04-08",
+    "availableFrom": "2023-03-18",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A503",
+    "title": "Finite Element Mesh",
+    "course": "RS105",
+    "description": "Create and justify a meshing strategy for a bracket; compare refinements.",
+    "points": 120,
+    "dueDate": "2023-04-29",
+    "availableFrom": "2023-04-08",
+    "availableUntil": "2023-05-15"
+  },
+
+  {
+    "_id": "A601",
+    "title": "Power Budget Spreadsheet",
+    "course": "RS106",
+    "description": "Build a power budget with mode-by-mode margins and worst-case analysis.",
+    "points": 60,
+    "dueDate": "2023-03-07",
+    "availableFrom": "2023-02-14",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A602",
+    "title": "Thermal Vacuum Test",
+    "course": "RS106",
+    "description": "Plan a TVAC test including cycles, instrumentation, and acceptance.",
+    "points": 120,
+    "dueDate": "2023-04-04",
+    "availableFrom": "2023-03-14",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A603",
+    "title": "Radiation Shielding Study",
+    "course": "RS106",
+    "description": "Compare shielding materials; estimate TID for LEO and GEO environments.",
+    "points": 110,
+    "dueDate": "2023-04-26",
+    "availableFrom": "2023-04-05",
+    "availableUntil": "2023-05-15"
+  },
+
+  {
+    "_id": "A701",
+    "title": "Mission Design Proposal",
+    "course": "RS107",
+    "description": "Write a preliminary mission concept with objectives, ΔV, and risks.",
+    "points": 150,
+    "dueDate": "2023-04-10",
+    "availableFrom": "2023-03-20",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A702",
+    "title": "Delta-V Trade Study",
+    "course": "RS107",
+    "description": "Perform ΔV tradeoffs for alternate trajectories with constraints.",
+    "points": 120,
+    "dueDate": "2023-04-28",
+    "availableFrom": "2023-04-07",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A703",
+    "title": "Launch Operations Checklist",
+    "course": "RS107",
+    "description": "Create a pre-launch checklist including hold points and criteria.",
+    "points": 100,
+    "dueDate": "2023-05-10",
+    "availableFrom": "2023-04-19",
+    "availableUntil": "2023-05-15"
+  },
+
+  {
+    "_id": "A801",
+    "title": "Council Deliberation Essay",
+    "course": "RS108",
+    "description": "Essay on inter-species diplomacy and governance in Middle-earth.",
+    "points": 100,
+    "dueDate": "2023-03-22",
+    "availableFrom": "2023-03-01",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A802",
+    "title": "Treaty Draft Between Realms",
+    "course": "RS108",
+    "description": "Draft a treaty framework addressing borders, trade, and security.",
+    "points": 120,
+    "dueDate": "2023-04-18",
+    "availableFrom": "2023-03-28",
+    "availableUntil": "2023-05-15"
+  },
+  {
+    "_id": "A803",
+    "title": "Case Study: War of the Ring",
+    "course": "RS108",
+    "description": "Analyze diplomatic failures and resolutions from the War of the Ring.",
+    "points": 150,
+    "dueDate": "2023-05-08",
+    "availableFrom": "2023-04-17",
+    "availableUntil": "2023-05-15"
+  }
 ]
+

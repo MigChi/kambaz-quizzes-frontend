@@ -1,89 +1,41 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { modules as modulesJson } from "../../../Database/index";
-
-
-export type Lesson = {
-  _id: string;
-  name: string;
-  description?: string;
-  module?: string;
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { createSlice } from "@reduxjs/toolkit";
+import { v4 as uuidv4 } from "uuid";
+const initialState = {
+  modules: [],
 };
-
-export type Module = {
-  _id: string;
-  name: string;
-  course: string;
-  lessons: Lesson[];
-  editing?: boolean;
-};
-
-export type ModulesState = {
-  modules: Module[];
-};
-
-const newId = () => `M${Date.now()}${Math.floor(Math.random() * 1_000_000)}`;
-
-function isLesson(v: unknown): v is Lesson {
-  if (typeof v !== "object" || v === null) return false;
-  const o = v as Record<string, unknown>;
-  return typeof o._id === "string" && typeof o.name === "string";
-}
-
-function isModule(v: unknown): v is Module {
-  if (typeof v !== "object" || v === null) return false;
-  const o = v as Record<string, unknown>;
-  const core =
-    typeof o._id === "string" &&
-    typeof o.name === "string" &&
-    typeof o.course === "string";
-
-  const l = (o as { lessons?: unknown }).lessons;
-  const lessonsOk = l === undefined || (Array.isArray(l) && l.every(isLesson));
-
-  return core && lessonsOk;
-}
-
-const initialState: ModulesState = {
-  modules: Array.isArray(modulesJson)
-    ? (modulesJson as unknown[]).filter(isModule) as Module[]
-    : [],
-};
-
 const modulesSlice = createSlice({
   name: "modules",
   initialState,
   reducers: {
-    addModule: (
-      state,
-      { payload }: PayloadAction<{ name: string; course: string }>
-    ) => {
-      state.modules.push({
-        _id: newId(),
+    setModules: (state, action) => {
+      state.modules = action.payload;
+    },
+    addModule: (state, { payload: module }) => {
+      const newModule: any = {
+        _id: uuidv4(),
         lessons: [],
-        name: payload.name,
-        course: payload.course,
-      });
+        name: module.name,
+        course: module.course,
+      };
+      state.modules = [...state.modules, newModule] as any;
     },
-
-    deleteModule: (state, { payload }: PayloadAction<string>) => {
-      state.modules = state.modules.filter((m) => m._id !== payload);
+    deleteModule: (state, { payload: moduleId }) => {
+      state.modules = state.modules.filter(
+        (m: any) => m._id !== moduleId);
     },
-
-    updateModule: (state, { payload }: PayloadAction<Module>) => {
-      state.modules = state.modules.map((m) =>
-        m._id === payload._id ? payload : m
-      );
+    updateModule: (state, { payload: module }) => {
+      state.modules = state.modules.map((m: any) =>
+        m._id === module._id ? module : m
+      ) as any;
     },
-
-    editModule: (state, { payload }: PayloadAction<string>) => {
-      state.modules = state.modules.map((m) =>
-        m._id === payload ? { ...m, editing: true } : m
-      );
+    editModule: (state, { payload: moduleId }) => {
+      state.modules = state.modules.map((m: any) =>
+        m._id === moduleId ? { ...m, editing: true } : m
+      ) as any;
     },
   },
 });
-
-export const { addModule, deleteModule, updateModule, editModule } =
+export const { addModule, deleteModule, updateModule, editModule, setModules } =
   modulesSlice.actions;
-
 export default modulesSlice.reducer;

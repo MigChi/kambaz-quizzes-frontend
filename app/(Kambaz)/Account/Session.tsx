@@ -1,33 +1,32 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-
-import { useEffect, useState, ReactNode } from "react";
-import { useDispatch } from "react-redux";
-import { setCurrentUser } from "./reducer";
 import * as client from "./client";
+import { useEffect, useState } from "react";
+import { setCurrentUser } from "./reducer";
+import { useDispatch } from "react-redux";
 
-export default function Session({ children }: { children: ReactNode }) {
+export default function Session({ children }: { children: any }) {
   const [pending, setPending] = useState(true);
   const dispatch = useDispatch();
 
   const fetchProfile = async () => {
     try {
       const currentUser = await client.profile();
-      if (currentUser) {
-        dispatch(setCurrentUser(currentUser));
-      }
-    } catch (err: unknown) {
-      console.error(err);
+      dispatch(setCurrentUser(currentUser));
+    } catch (err: any) {
+      console.error("Profile fetch failed:", err);
+    } finally {
+      setPending(false);
     }
-    setPending(false);
   };
 
   useEffect(() => {
     fetchProfile();
   }, []);
 
-  if (!pending) {
-    return <>{children}</>;
+  if (pending) {
+    return null;
   }
 
-  return null;
+  return children;
 }
