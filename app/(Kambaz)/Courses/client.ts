@@ -8,6 +8,7 @@ const USERS_API = `${HTTP_SERVER}/api/users`;
 
 export const fetchAllCourses = async () => {
   const { data } = await axios.get(COURSES_API);
+  console.log("fetchAllCourses data:", data);
   return data;
 };
 

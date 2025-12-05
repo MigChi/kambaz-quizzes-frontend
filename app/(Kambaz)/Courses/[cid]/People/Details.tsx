@@ -137,7 +137,7 @@ export default function PeopleDetails({
           <option value="STUDENT">STUDENT</option>
           <option value="FACULTY">FACULTY</option>
           <option value="ADMIN">ADMIN</option>
-          <option value="USER">USER</option>
+          <option value="TA">ASSISTANT</option>
         </select>
       ) : (
         <span className="wd-roles ms-1">{user.role}</span>

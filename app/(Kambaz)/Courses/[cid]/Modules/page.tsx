@@ -15,11 +15,18 @@ import * as client from "../../client";
 export default function Modules() {
   const { cid } = useParams();
   const [moduleName, setModuleName] = useState("");
-  const { modules } = useSelector((state: any) => state.modulesReducer);
   const dispatch = useDispatch();
 
+  const { modules } = useSelector((state: any) => state.modulesReducer);
+  const { currentUser } = useSelector((state: any) => state.accountReducer);
+
+  const isFaculty =
+    currentUser?.role === "FACULTY" || currentUser?.role === "ADMIN";
+
   const onCreateModuleForCourse = async () => {
+    if (!isFaculty) return;             
     if (!cid || !moduleName.trim()) return;
+
     const newModule = { name: moduleName };
     const serverModule = await client.createModuleForCourse(
       cid as string,
@@ -30,13 +37,17 @@ export default function Modules() {
   };
 
   const onRemoveModule = async (moduleId: string) => {
+    if (!isFaculty) return;              
     if (!cid) return;
+
     await client.deleteModule(cid as string, moduleId);
     dispatch(setModules(modules.filter((m: any) => m._id !== moduleId)));
   };
 
   const onUpdateModule = async (module: any) => {
+    if (!isFaculty) return;              
     if (!cid) return;
+
     const updated = await client.updateModule(cid as string, module);
     const newModules = modules.map((m: any) =>
       m._id === updated._id ? updated : m
@@ -57,16 +68,21 @@ export default function Modules() {
 
   return (
     <div>
-      <ModulesControls
-        setModuleName={setModuleName}
-        moduleName={moduleName}
-        addModule={onCreateModuleForCourse}
-      />
+      {/* 🔒 Only faculty/admin see the "New Module" controls */}
+      {isFaculty && (
+        <>
+          <ModulesControls
+            setModuleName={setModuleName}
+            moduleName={moduleName}
+            addModule={onCreateModuleForCourse}
+          />
 
-      <br />
-      <br />
-      <br />
-      <br />
+          <br />
+          <br />
+          <br />
+          <br />
+        </>
+      )}
 
       <ListGroup id="wd-modules" className="rounded-0">
         {modules.map((module: any) => (
@@ -77,9 +93,10 @@ export default function Modules() {
             <div className="wd-title p-3 ps-2 bg-secondary">
               <BsGripVertical className="me-2 fs-3" />
 
+              {/* Students just see the name; faculty can toggle editing */}
               {!module.editing && module.name}
 
-              {module.editing && (
+              {module.editing && isFaculty && (
                 <FormControl
                   className="w-50 d-inline-block"
                   value={module.name}
@@ -96,11 +113,14 @@ export default function Modules() {
                 />
               )}
 
-              <ModuleControlButtons
-                moduleId={module._id}
-                deleteModule={(moduleId) => onRemoveModule(moduleId)}
-                editModule={(moduleId) => dispatch(editModule(moduleId))}
-              />
+              {/* 🔒 Only faculty/admin get edit/delete controls */}
+              {isFaculty && (
+                <ModuleControlButtons
+                  moduleId={module._id}
+                  deleteModule={(moduleId) => onRemoveModule(moduleId)}
+                  editModule={(moduleId) => dispatch(editModule(moduleId))}
+                />
+              )}
             </div>
 
             {module.lessons && module.lessons.length > 0 && (
@@ -111,7 +131,8 @@ export default function Modules() {
                     key={lesson._id}
                   >
                     <BsGripVertical className="me-2 fs-3" /> {lesson.name}
-                    <LessonControlButtons />
+                    {/* 🔒 Only faculty/admin get lesson control buttons */}
+                    {isFaculty && <LessonControlButtons />}
                   </ListGroupItem>
                 ))}
               </ListGroup>

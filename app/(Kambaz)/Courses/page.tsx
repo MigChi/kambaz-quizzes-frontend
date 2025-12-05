@@ -31,6 +31,10 @@ export default function CoursesPage() {
     fetchCourses();
   }, []);
 
+useEffect(() => {
+  console.log("Courses from Redux in /Courses:", courses);
+}, [courses]);
+  
   return (
     <div id="wd-courses-list">
       <h1>Courses</h1>

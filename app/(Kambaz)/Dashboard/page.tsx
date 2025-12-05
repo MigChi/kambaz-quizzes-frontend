@@ -31,7 +31,6 @@ export default function Dashboard() {
     name: "",
     number: "",
     description: "",
-    image: "/images/NU_RGB_Notched-N_motto_RB.png",
     startDate: "2023-09-10",
     endDate: "2023-12-15",
   });
