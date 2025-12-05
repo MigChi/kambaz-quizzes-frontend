@@ -56,7 +56,6 @@ const availabilityStatus = (quiz: Quiz) => {
   if (from && now >= from && (!until || now <= until)) {
     return "Available";
   }
-  // If no dates configured, just say Available
   return "Available";
 };
 
@@ -152,7 +151,8 @@ export default function QuizzesPage() {
     try {
       const created = await client.createQuizForCourse(cid, defaultQuiz);
       dispatch(addQuiz(created));
-      router.push(`/Courses/${cid}/Quizzes/${created._id}`);
+      // 👉 Go straight to the Editor screen
+      router.push(`/Courses/${cid}/Quizzes/${created._id}/Edit`);
     } catch (e) {
       console.error("Failed to create quiz:", e);
     }
@@ -245,7 +245,6 @@ export default function QuizzesPage() {
             const numQuestions =
               (quiz.questions && quiz.questions.length) || 0;
 
-            // 🔑 Safe, always-present key
             const key =
               quiz._id ??
               `${quiz.title || "quiz"}-${quiz.course || cid}-${index}`;
@@ -275,7 +274,7 @@ export default function QuizzesPage() {
                         {quiz.published ? "✅" : "🚫"}
                       </span>
 
-                      {/* Title linking to details */}
+                      {/* Title → Details screen */}
                       <Link
                         href={`/Courses/${cid}/Quizzes/${quiz._id}`}
                         className="fw-semibold text-dark text-decoration-none"
@@ -296,8 +295,7 @@ export default function QuizzesPage() {
                       {currentUser?.role === "STUDENT" && (
                         <>
                           {" "}
-                          | <b>Score</b> {/* placeholder; real attempts later */}
-                          --
+                          | <b>Score</b> --
                         </>
                       )}
                     </div>
@@ -319,7 +317,7 @@ export default function QuizzesPage() {
                           <Dropdown.Item
                             onClick={() =>
                               router.push(
-                                `/Courses/${cid}/Quizzes/${quiz._id}`
+                                `/Courses/${cid}/Quizzes/${quiz._id}/Edit`
                               )
                             }
                           >
