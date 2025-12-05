@@ -72,9 +72,9 @@ export default function QuizzesPage() {
   const isFaculty =
     currentUser?.role === "FACULTY" || currentUser?.role === "ADMIN";
 
-  const [sortBy, setSortBy] = useState<"DEFAULT" | "TITLE" | "DUE" | "AVAILABLE">(
-    "DEFAULT"
-  );
+  const [sortBy, setSortBy] = useState<
+    "DEFAULT" | "TITLE" | "DUE" | "AVAILABLE"
+  >("DEFAULT");
 
   useEffect(() => {
     const load = async () => {
@@ -91,7 +91,9 @@ export default function QuizzesPage() {
   }, [cid, dispatch]);
 
   const sortedQuizzes: Quiz[] = useMemo(() => {
-    const list = [...(quizzes ?? [])];
+    const base = Array.isArray(quizzes) ? quizzes.filter(Boolean) : [];
+    const list = [...base];
+
     if (sortBy === "TITLE") {
       return list.sort((a, b) =>
         (a.title || "").localeCompare(b.title || "")
@@ -99,8 +101,12 @@ export default function QuizzesPage() {
     }
     if (sortBy === "DUE") {
       return list.sort((a, b) => {
-        const da = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-        const db = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+        const da = a.dueDate
+          ? new Date(a.dueDate).getTime()
+          : Number.MAX_SAFE_INTEGER;
+        const db = b.dueDate
+          ? new Date(b.dueDate).getTime()
+          : Number.MAX_SAFE_INTEGER;
         return da - db;
       });
     }
@@ -233,13 +239,20 @@ export default function QuizzesPage() {
             <b>QUIZZES</b>
           </ListGroupItem>
 
-          {sortedQuizzes.map((quiz) => {
+          {sortedQuizzes.map((quiz, index) => {
+            if (!quiz) return null;
+
             const numQuestions =
               (quiz.questions && quiz.questions.length) || 0;
 
+            // 🔑 Safe, always-present key
+            const key =
+              quiz._id ??
+              `${quiz.title || "quiz"}-${quiz.course || cid}-${index}`;
+
             return (
               <ListGroupItem
-                key={quiz._id}
+                key={key}
                 className="wd-quiz p-3 ps-1"
               >
                 <div className="row align-items-center g-3">
@@ -297,7 +310,7 @@ export default function QuizzesPage() {
                         <Dropdown.Toggle
                           variant="light"
                           size="sm"
-                          id={`wd-quiz-actions-${quiz._id}`}
+                          id={`wd-quiz-actions-${key}`}
                           className="border-0"
                         >
                           <IoEllipsisVertical />
@@ -313,7 +326,7 @@ export default function QuizzesPage() {
                             Edit
                           </Dropdown.Item>
                           <Dropdown.Item
-                            onClick={() => handleDeleteQuiz(quiz._id)}
+                            onClick={() => handleDeleteQuiz(quiz._id!)}
                           >
                             Delete
                           </Dropdown.Item>
@@ -321,12 +334,6 @@ export default function QuizzesPage() {
                             onClick={() => handleTogglePublish(quiz)}
                           >
                             {quiz.published ? "Unpublish" : "Publish"}
-                          </Dropdown.Item>
-                          <Dropdown.Divider />
-                          {/* Optional stubs for Copy/Sort as spec suggests */}
-                          <Dropdown.Item disabled>Copy (optional)</Dropdown.Item>
-                          <Dropdown.Item disabled>
-                            Sort by… (use header control)
                           </Dropdown.Item>
                         </Dropdown.Menu>
                       </Dropdown>
