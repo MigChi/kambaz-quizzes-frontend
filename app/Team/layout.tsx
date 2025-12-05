@@ -1,13 +1,10 @@
 "use client";
 
 import { ReactNode } from "react";
-import { Provider } from "react-redux";
-import store from "@/app/Labs/Lab4/store"; 
 import TOC from "./TOC";
 
 export default function LabsLayout({ children }: { children: ReactNode }) {
   return (
-    <Provider store={store}>
       <table>
         <tbody>
           <tr>
@@ -16,6 +13,5 @@ export default function LabsLayout({ children }: { children: ReactNode }) {
           </tr>
         </tbody>
       </table>
-    </Provider>
   );
 }
