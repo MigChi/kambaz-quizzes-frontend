@@ -206,7 +206,6 @@ const computeInitialAnswers = (
     questionId: question.id,
     answerType: question.questionType,
     selectedChoiceId: undefined,
-    // Don't pre-select True/False; start unanswered
     trueFalseSelection: undefined,
     fillBlankResponse: "",
   }));
@@ -400,7 +399,8 @@ export default function QuizPreviewPage() {
         answerType: stored.answerType as QuestionType,
         selectedChoiceId: stored.selectedChoiceId,
         trueFalseSelection:
-          (stored.trueFalseSelection as "TRUE" | "FALSE" | undefined) ?? undefined,
+          (stored.trueFalseSelection as "TRUE" | "FALSE" | undefined) ??
+          undefined,
         fillBlankResponse: stored.fillBlankResponse ?? "",
       };
     });
