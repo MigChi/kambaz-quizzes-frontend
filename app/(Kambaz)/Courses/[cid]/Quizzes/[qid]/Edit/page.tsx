@@ -23,11 +23,11 @@ type FormState = {
   timeLimit: number;
   multipleAttempts: string; // Yes/No
   allowedAttempts: number;
-  showCorrectAnswers: string;
+  showCorrectAnswers: string; // "" | "Yes" | "No"
   accessCode: string;
-  oneQuestionAtATime: string; // Yes/No
+  oneQuestionAtATime: string; // "" | "Yes" | "No"
   webcamRequired: string; // Yes/No
-  lockQuestionsAfterAnswering: string; // Yes/No
+  lockQuestionsAfterAnswering: string; // "" | "Yes" | "No"
   dueDate?: string | null;
   availableFrom?: string | null;
   availableUntil?: string | null;
@@ -46,11 +46,12 @@ const defaultForm = (cid: string): FormState => ({
   timeLimit: 20,
   multipleAttempts: "No",
   allowedAttempts: 1,
+  // defaults blank so behavior is "off" unless explicitly Yes
   showCorrectAnswers: "",
   accessCode: "",
-  oneQuestionAtATime: "Yes",
+  oneQuestionAtATime: "",
   webcamRequired: "No",
-  lockQuestionsAfterAnswering: "No",
+  lockQuestionsAfterAnswering: "",
   dueDate: null,
   availableFrom: null,
   availableUntil: null,
@@ -90,10 +91,10 @@ export default function QuizEditorPage() {
           allowedAttempts: existing.allowedAttempts ?? 1,
           showCorrectAnswers: existing.showCorrectAnswers ?? "",
           accessCode: existing.accessCode ?? "",
-          oneQuestionAtATime: existing.oneQuestionAtATime ?? "Yes",
+          oneQuestionAtATime: existing.oneQuestionAtATime ?? "",
           webcamRequired: existing.webcamRequired ?? "No",
           lockQuestionsAfterAnswering:
-            existing.lockQuestionsAfterAnswering ?? "No",
+            existing.lockQuestionsAfterAnswering ?? "",
           dueDate: existing.dueDate ?? null,
           availableFrom: existing.availableFrom ?? null,
           availableUntil: existing.availableUntil ?? null,
@@ -138,7 +139,8 @@ export default function QuizEditorPage() {
         existing.oneQuestionAtATime ?? prev.oneQuestionAtATime,
       webcamRequired: existing.webcamRequired ?? prev.webcamRequired,
       lockQuestionsAfterAnswering:
-        existing.lockQuestionsAfterAnswering ?? prev.lockQuestionsAfterAnswering,
+        existing.lockQuestionsAfterAnswering ??
+        prev.lockQuestionsAfterAnswering,
       dueDate: existing.dueDate ?? prev.dueDate,
       availableFrom: existing.availableFrom ?? prev.availableFrom,
       availableUntil: existing.availableUntil ?? prev.availableUntil,
@@ -178,7 +180,10 @@ export default function QuizEditorPage() {
   };
 
   const onSave = async () => {
-    await persistQuiz({}, quizId ? `/Courses/${cid}/Quizzes/${quizId}` : undefined);
+    await persistQuiz(
+      {},
+      quizId ? `/Courses/${cid}/Quizzes/${quizId}` : undefined
+    );
   };
 
   const onSaveAndPublish = async () => {
@@ -389,15 +394,14 @@ export default function QuizEditorPage() {
           </Col>
         </Row>
 
-        {/* Show Correct Answers */}
+        {/* Show Correct Answers (dropdown, default blank) */}
         <Row className="align-items-center mb-3">
           <Col sm={4} className="text-sm-end fw-semibold">
             <Form.Label>Show Correct Answers</Form.Label>
           </Col>
           <Col sm={8}>
-            <Form.Control
-              type="text"
-              value={form.showCorrectAnswers}
+            <Form.Select
+              value={form.showCorrectAnswers || ""}
               disabled={readOnly}
               onChange={(e) =>
                 setForm({
@@ -405,7 +409,12 @@ export default function QuizEditorPage() {
                   showCorrectAnswers: e.target.value,
                 })
               }
-            />
+              style={{ maxWidth: 260 }}
+            >
+              <option value="">--</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </Form.Select>
           </Col>
         </Row>
 
@@ -427,14 +436,14 @@ export default function QuizEditorPage() {
           </Col>
         </Row>
 
-        {/* One Question at a Time */}
+        {/* One Question at a Time (dropdown, default blank) */}
         <Row className="align-items-center mb-3">
           <Col sm={4} className="text-sm-end fw-semibold">
             <Form.Label>One Question at a Time</Form.Label>
           </Col>
           <Col sm={8}>
             <Form.Select
-              value={form.oneQuestionAtATime}
+              value={form.oneQuestionAtATime || ""}
               disabled={readOnly}
               onChange={(e) =>
                 setForm({
@@ -444,8 +453,9 @@ export default function QuizEditorPage() {
               }
               style={{ maxWidth: 260 }}
             >
-              <option>Yes</option>
-              <option>No</option>
+              <option value="">--</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
             </Form.Select>
           </Col>
         </Row>
@@ -470,14 +480,14 @@ export default function QuizEditorPage() {
           </Col>
         </Row>
 
-        {/* Lock Questions After Answering */}
+        {/* Lock Questions After Answering (dropdown, default blank) */}
         <Row className="align-items-center mb-4">
           <Col sm={4} className="text-sm-end fw-semibold">
             <Form.Label>Lock Questions After Answering</Form.Label>
           </Col>
           <Col sm={8}>
             <Form.Select
-              value={form.lockQuestionsAfterAnswering}
+              value={form.lockQuestionsAfterAnswering || ""}
               disabled={readOnly}
               onChange={(e) =>
                 setForm({
@@ -487,8 +497,9 @@ export default function QuizEditorPage() {
               }
               style={{ maxWidth: 260 }}
             >
-              <option>No</option>
-              <option>Yes</option>
+              <option value="">--</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
             </Form.Select>
           </Col>
         </Row>

@@ -525,7 +525,7 @@ export default function QuizPreviewPage() {
 
   // Timer: reset whenever we start a new attempt (and timeLimit > 0)
   useEffect(() => {
-    if (!loadedQuiz) {
+    if (!isStudent || !loadedQuiz) {
       setTimeRemainingSeconds(null);
       setHasAutoSubmitted(false);
       return;
@@ -540,7 +540,7 @@ export default function QuizPreviewPage() {
       setTimeRemainingSeconds(null);
       setHasAutoSubmitted(false);
     }
-  }, [loadedQuiz, mode]);
+  }, [isStudent, loadedQuiz, mode]);
 
   // Timer countdown
   useEffect(() => {
@@ -660,9 +660,10 @@ export default function QuizPreviewPage() {
     }
   };
 
-  // Auto-submit when time runs out (for active attempts only)
+  // Auto-submit when time runs out (for active attempts only; students only)
   useEffect(() => {
     if (
+      !isStudent ||
       mode !== "TAKE_NEW_ATTEMPT" ||
       timeRemainingSeconds === null ||
       timeRemainingSeconds > 0 ||
@@ -673,7 +674,7 @@ export default function QuizPreviewPage() {
     setHasAutoSubmitted(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     handleSubmit();
-  }, [mode, timeRemainingSeconds, hasAutoSubmitted]);
+  }, [isStudent, mode, timeRemainingSeconds, hasAutoSubmitted]);
 
   // 🔽 EARLY RETURNS COME AFTER ALL HOOKS 🔽
 
@@ -702,39 +703,26 @@ export default function QuizPreviewPage() {
   const timeLimitMinutes =
     typeof loadedQuiz.timeLimit === "number" ? loadedQuiz.timeLimit : 0;
 
-  const oneAtATimeEnabled =
-    (loadedQuiz.oneQuestionAtATime ?? "Yes")
-      .toString()
-      .toUpperCase() === "YES";
+  const oneAtATimeRaw = (loadedQuiz.oneQuestionAtATime ?? "")
+    .toString()
+    .toUpperCase();
+  const lockAfterAnswerRaw = (loadedQuiz.lockQuestionsAfterAnswering ?? "")
+    .toString()
+    .toUpperCase();
 
+  // Only "YES" means enabled; blank or anything else is treated as off.
+  const oneAtATimeEnabled = oneAtATimeRaw === "YES";
   const lockAfterAnswerEnabled =
-    oneAtATimeEnabled &&
-    (loadedQuiz.lockQuestionsAfterAnswering ?? "No")
-      .toString()
-      .toUpperCase() === "YES";
+    oneAtATimeEnabled && lockAfterAnswerRaw === "YES";
 
-  const showCorrectAnswersRaw = (
-    loadedQuiz.showCorrectAnswers || ""
-  )
-    .trim()
-    .toLowerCase();
+  const showCorrectAnswersRaw = (loadedQuiz.showCorrectAnswers ?? "")
+    .toString()
+    .toUpperCase();
 
-  const dueDateString = loadedQuiz.dueDate ?? null;
-  let dueDatePassed = false;
-  if (dueDateString) {
-    const d = new Date(dueDateString);
-    if (!Number.isNaN(d.getTime())) {
-      const now = new Date();
-      dueDatePassed = now.getTime() > d.getTime();
-    }
-  }
-
+  // Simple Yes/No behavior: if dropdown is "YES", show correct answers;
+  // otherwise don't (students). Staff always see answers.
   const shouldShowCorrectAnswersToStudent =
-    !!answerEvaluations &&
-    (showCorrectAnswersRaw === "yes" ||
-      showCorrectAnswersRaw.includes("immediately") ||
-      showCorrectAnswersRaw.includes("always") ||
-      (showCorrectAnswersRaw.includes("after") && dueDatePassed));
+    !!answerEvaluations && showCorrectAnswersRaw === "YES";
 
   const scoreSummary =
     answerEvaluations && questions.length
@@ -823,7 +811,8 @@ export default function QuizPreviewPage() {
           <div className="text-muted small">
             {loadedQuiz.questions?.length ?? 0} questions · {totalPoints} points
           </div>
-          {timeLimitMinutes > 0 &&
+          {isStudent &&
+            timeLimitMinutes > 0 &&
             mode === "TAKE_NEW_ATTEMPT" &&
             timeRemainingSeconds !== null && (
               <div className="text-muted small">
