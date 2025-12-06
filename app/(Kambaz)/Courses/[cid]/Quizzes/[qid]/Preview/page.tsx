@@ -337,7 +337,6 @@ export default function QuizPreviewPage() {
 
   const role = currentUser?.role;
   const isStudent = role === "STUDENT";
-  const isTA = role === "TA";
   const isFaculty = role === "FACULTY" || role === "ADMIN";
   const isStaffPreview = !isStudent; // faculty or TA or others
 
