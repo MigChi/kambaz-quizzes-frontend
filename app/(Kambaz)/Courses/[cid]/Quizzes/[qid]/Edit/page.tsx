@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { Form, Row, Col, InputGroup, Button } from "react-bootstrap";
+import { Form, Row, Col, InputGroup, Button, Nav } from "react-bootstrap";
 import { useParams, useRouter } from "next/navigation";
 import { BsCalendar3 } from "react-icons/bs";
 import { useDispatch, useSelector } from "react-redux";
@@ -146,27 +146,46 @@ export default function QuizEditorPage() {
     }));
   }, [existing, cid]);
 
-  const onSave = async () => {
-    if (readOnly) return;
-    if (!form._id) {
-      // Shouldn't happen when coming from +Quiz, but just in case
-      return;
-    }
+  const quizId = form._id ?? qid;
 
+  const persistQuiz = async (
+    extra: Partial<FormState> = {},
+    destination?: string
+  ) => {
+    if (readOnly) return;
+    if (!form._id) return;
+
+    const merged = { ...form, ...extra };
     const payload = {
-      ...form,
-      points: Number(form.points) || 0,
-      timeLimit: Number(form.timeLimit) || 0,
-      allowedAttempts: Number(form.allowedAttempts) || 1,
+      ...merged,
+      points: Number(merged.points) || 0,
+      timeLimit: Number(merged.timeLimit) || 0,
+      allowedAttempts: Number(merged.allowedAttempts) || 1,
     };
 
     try {
       const updated = await client.updateQuiz(payload);
       dispatch(updateQuiz(updated));
-      router.push(`/Courses/${cid}/Quizzes`);
+      router.push(
+        destination ??
+          (quizId
+            ? `/Courses/${cid}/Quizzes/${quizId}`
+            : `/Courses/${cid}/Quizzes`)
+      );
     } catch (e) {
       console.error("Failed to save quiz:", e);
     }
+  };
+
+  const onSave = async () => {
+    await persistQuiz({}, quizId ? `/Courses/${cid}/Quizzes/${quizId}` : undefined);
+  };
+
+  const onSaveAndPublish = async () => {
+    await persistQuiz(
+      { published: true },
+      `/Courses/${cid}/Quizzes`
+    );
   };
 
   const onCancel = () => {
@@ -179,6 +198,26 @@ export default function QuizEditorPage() {
       style={{ maxWidth: 650 }}
       className="mx-auto"
     >
+      <Nav variant="tabs" className="mb-4">
+        <Nav.Item>
+          <Nav.Link active>Details</Nav.Link>
+        </Nav.Item>
+        <Nav.Item>
+          <Nav.Link
+            role="button"
+            onClick={() => {
+              if (quizId) {
+                router.push(
+                  `/Courses/${cid}/Quizzes/${quizId}/Questions`
+                );
+              }
+            }}
+            disabled={!quizId}
+          >
+            Questions
+          </Nav.Link>
+        </Nav.Item>
+      </Nav>
       <Form>
         {/* Title */}
         <Form.Label htmlFor="wd-quiz-title" as="h2" className="fw-bold mb-2">
@@ -534,19 +573,28 @@ export default function QuizEditorPage() {
         </Row>
 
         {/* Buttons */}
-        <div className="d-flex justify-content-end gap-2">
+        <div className="d-flex justify-content-end gap-2 flex-wrap">
           <Button variant="light" onClick={onCancel}>
             Cancel
           </Button>
 
           {!readOnly && (
-            <Button
-              variant="danger"
-              onClick={onSave}
-              id="wd-save-quiz"
-            >
-              Save
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                onClick={onSave}
+                id="wd-save-quiz"
+              >
+                Save
+              </Button>
+              <Button
+                variant="danger"
+                onClick={onSaveAndPublish}
+                id="wd-save-publish-quiz"
+              >
+                Save &amp; Publish
+              </Button>
+            </>
           )}
         </div>
       </Form>
