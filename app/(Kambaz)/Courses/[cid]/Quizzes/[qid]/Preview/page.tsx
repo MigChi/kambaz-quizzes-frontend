@@ -330,11 +330,16 @@ export default function QuizPreviewPage() {
   );
   const [hasAutoSubmitted, setHasAutoSubmitted] = useState(false);
 
+  // Access code gate state
+  const [accessCodeInput, setAccessCodeInput] = useState("");
+  const [accessCodeError, setAccessCodeError] = useState<string | null>(null);
+  const [accessCodeVerified, setAccessCodeVerified] = useState(false);
+
   const role = currentUser?.role;
   const isStudent = role === "STUDENT";
   const isTA = role === "TA";
   const isFaculty = role === "FACULTY" || role === "ADMIN";
-  const isStaffPreview = !isStudent; // faculty or TA
+  const isStaffPreview = !isStudent; // faculty or TA or others
 
   // Load quiz if direct nav
   useEffect(() => {
@@ -523,9 +528,9 @@ export default function QuizPreviewPage() {
   const studentOutOfAttempts =
     isStudent && hasLoadedAttempts && attemptsRemaining <= 0;
 
-  // Timer: reset whenever we start a new attempt (and timeLimit > 0)
+  // Timer: reset whenever we start a new attempt (and timeLimit > 0) — students only
   useEffect(() => {
-    if (!isStudent || !loadedQuiz) {
+    if (!loadedQuiz || !isStudent) {
       setTimeRemainingSeconds(null);
       setHasAutoSubmitted(false);
       return;
@@ -540,7 +545,7 @@ export default function QuizPreviewPage() {
       setTimeRemainingSeconds(null);
       setHasAutoSubmitted(false);
     }
-  }, [isStudent, loadedQuiz, mode]);
+  }, [loadedQuiz, mode, isStudent]);
 
   // Timer countdown
   useEffect(() => {
@@ -593,7 +598,50 @@ export default function QuizPreviewPage() {
     router.push(`/Courses/${cid}/Quizzes/${qid}/Questions`);
   };
 
+  if (!loadedQuiz && isLoadingQuiz) {
+    return (
+      <div className="text-center text-muted py-5">
+        <Spinner animation="border" role="status" className="me-2" />
+        Loading quiz preview...
+      </div>
+    );
+  }
+
+  if (!loadedQuiz) {
+    return <div className="text-muted">Quiz not found.</div>;
+  }
+
+  // Students cannot access unpublished quizzes, but TAs & Faculty can
+  if (isStudent && !loadedQuiz.published) {
+    return (
+      <div className="text-muted">
+        This quiz is not available for students.
+      </div>
+    );
+  }
+
+  // === Access code requirement logic ===
+  const quizHasAccessCode =
+    !!loadedQuiz.accessCode && loadedQuiz.accessCode.trim().length > 0;
+
+  const requiresAccessCodeForStudent =
+    isStudent && quizHasAccessCode;
+
+  const showAccessCodeGate =
+    requiresAccessCodeForStudent &&
+    mode === "TAKE_NEW_ATTEMPT" &&
+    !accessCodeVerified;
+
   const handleSubmit = async () => {
+    // Don't allow submission if access code gate hasn't been satisfied
+    if (
+      requiresAccessCodeForStudent &&
+      mode === "TAKE_NEW_ATTEMPT" &&
+      !accessCodeVerified
+    ) {
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const evaluations = evaluateAnswers(questions, studentAnswers);
@@ -660,7 +708,7 @@ export default function QuizPreviewPage() {
     }
   };
 
-  // Auto-submit when time runs out (for active attempts only; students only)
+  // Auto-submit when time runs out (for active attempts only — students)
   useEffect(() => {
     if (
       !isStudent ||
@@ -674,55 +722,44 @@ export default function QuizPreviewPage() {
     setHasAutoSubmitted(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     handleSubmit();
-  }, [isStudent, mode, timeRemainingSeconds, hasAutoSubmitted]);
-
-  // 🔽 EARLY RETURNS COME AFTER ALL HOOKS 🔽
-
-  if (!loadedQuiz && isLoadingQuiz) {
-    return (
-      <div className="text-center text-muted py-5">
-        <Spinner animation="border" role="status" className="me-2" />
-        Loading quiz preview...
-      </div>
-    );
-  }
-
-  if (!loadedQuiz) {
-    return <div className="text-muted">Quiz not found.</div>;
-  }
-
-  // Students cannot access unpublished quizzes, but TAs & Faculty can
-  if (isStudent && !loadedQuiz.published) {
-    return (
-      <div className="text-muted">
-        This quiz is not available for students.
-      </div>
-    );
-  }
+  }, [mode, timeRemainingSeconds, hasAutoSubmitted, isStudent]);
 
   const timeLimitMinutes =
     typeof loadedQuiz.timeLimit === "number" ? loadedQuiz.timeLimit : 0;
 
-  const oneAtATimeRaw = (loadedQuiz.oneQuestionAtATime ?? "")
-    .toString()
-    .toUpperCase();
-  const lockAfterAnswerRaw = (loadedQuiz.lockQuestionsAfterAnswering ?? "")
-    .toString()
-    .toUpperCase();
+  const oneAtATimeEnabled =
+    (loadedQuiz.oneQuestionAtATime ?? "Yes")
+      .toString()
+      .toUpperCase() === "YES";
 
-  // Only "YES" means enabled; blank or anything else is treated as off.
-  const oneAtATimeEnabled = oneAtATimeRaw === "YES";
   const lockAfterAnswerEnabled =
-    oneAtATimeEnabled && lockAfterAnswerRaw === "YES";
+    oneAtATimeEnabled &&
+    (loadedQuiz.lockQuestionsAfterAnswering ?? "No")
+      .toString()
+      .toUpperCase() === "YES";
 
-  const showCorrectAnswersRaw = (loadedQuiz.showCorrectAnswers ?? "")
-    .toString()
-    .toUpperCase();
+  const showCorrectAnswersRaw = (
+    loadedQuiz.showCorrectAnswers || ""
+  )
+    .trim()
+    .toLowerCase();
 
-  // Simple Yes/No behavior: if dropdown is "YES", show correct answers;
-  // otherwise don't (students). Staff always see answers.
+  const dueDateString = loadedQuiz.dueDate ?? null;
+  let dueDatePassed = false;
+  if (dueDateString) {
+    const d = new Date(dueDateString);
+    if (!Number.isNaN(d.getTime())) {
+      const now = new Date();
+      dueDatePassed = now.getTime() > d.getTime();
+    }
+  }
+
   const shouldShowCorrectAnswersToStudent =
-    !!answerEvaluations && showCorrectAnswersRaw === "YES";
+    !!answerEvaluations &&
+    (showCorrectAnswersRaw === "yes" ||
+      showCorrectAnswersRaw.includes("immediately") ||
+      showCorrectAnswersRaw.includes("always") ||
+      (showCorrectAnswersRaw.includes("after") && dueDatePassed));
 
   const scoreSummary =
     answerEvaluations && questions.length
@@ -798,6 +835,8 @@ export default function QuizPreviewPage() {
 
     setCurrentQuestionIndex(nextIndex);
   };
+
+  const readOnly = isStudent && mode === "VIEW_LAST_ATTEMPT";
 
   return (
     <div
@@ -876,6 +915,9 @@ export default function QuizPreviewPage() {
                     setAnswerEvaluations(null);
                     setLockedQuestionIds([]);
                     setCurrentQuestionIndex(0);
+                    setAccessCodeVerified(false);
+                    setAccessCodeInput("");
+                    setAccessCodeError(null);
                   }}
                 >
                   Retake Quiz
@@ -891,7 +933,8 @@ export default function QuizPreviewPage() {
               disabled={
                 isSubmitting ||
                 !hasLoadedAttempts ||
-                studentOutOfAttempts
+                studentOutOfAttempts ||
+                (requiresAccessCodeForStudent && !accessCodeVerified)
               }
             >
               {isSubmitting ? "Submitting..." : "Submit Quiz"}
@@ -902,184 +945,230 @@ export default function QuizPreviewPage() {
 
       {renderSummaryBanner()}
 
-      <ListGroup>
-        {questions.map((question, index) => {
-          if (oneAtATimeEnabled && index !== currentQuestionIndex) {
-            return null;
-          }
-
-          const studentAnswer = studentAnswers.find(
-            (answer) => answer.questionId === question.id
-          );
-          const evaluation = answerEvaluations?.find(
-            (result) => result.questionId === question.id
-          );
-          const isCorrect = evaluation?.isCorrect ?? null;
-
-          const baseReadOnly = isStudent && mode === "VIEW_LAST_ATTEMPT";
-          const lockedForThisQuestion =
-            lockAfterAnswerEnabled &&
-            lockedQuestionIds.includes(question.id) &&
-            mode === "TAKE_NEW_ATTEMPT";
-          const readOnly = baseReadOnly || lockedForThisQuestion;
-
-          const canShowCorrectAnswers =
-            !!evaluation &&
-            (isStaffPreview || shouldShowCorrectAnswersToStudent);
-
-          return (
-            <ListGroup.Item
-              key={question.id}
-              className="mb-3 border-0"
+      {/* If access code is required and not yet verified, show gate instead of questions */}
+      {showAccessCodeGate ? (
+        <Card className="mt-3">
+          <Card.Body>
+            <Card.Title>Enter Access Code</Card.Title>
+            <p className="text-muted small mb-3">
+              This quiz requires an access code before you can begin.
+            </p>
+            <Form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const expected = (loadedQuiz.accessCode ?? "").trim();
+                if (accessCodeInput.trim() === expected) {
+                  setAccessCodeVerified(true);
+                  setAccessCodeError(null);
+                } else {
+                  setAccessCodeError("Incorrect access code. Please try again.");
+                }
+              }}
             >
-              <Card className="shadow-sm">
-                <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                  <div>
-                    <div className="fw-semibold">
-                      Question {index + 1}: {question.title}
-                    </div>
-                    <small className="text-muted">
-                      {QUESTION_TYPE_LABELS[question.questionType]}
-                    </small>
-                    {lockedForThisQuestion && !baseReadOnly && (
-                      <span className="ms-2 badge bg-warning text-dark">
-                        Locked after answering
-                      </span>
-                    )}
+              <Form.Group className="mb-3" controlId="wd-quiz-access-code">
+                <Form.Label>Access Code</Form.Label>
+                <Form.Control
+                  type="password"
+                  value={accessCodeInput}
+                  onChange={(e) => {
+                    setAccessCodeInput(e.target.value);
+                    if (accessCodeError) setAccessCodeError(null);
+                  }}
+                />
+                {accessCodeError && (
+                  <div className="text-danger small mt-1">
+                    {accessCodeError}
                   </div>
-                  <Badge bg="light" text="dark">
-                    {question.points} pts
-                  </Badge>
-                </Card.Header>
-                <Card.Body>
-                  <p>{question.prompt}</p>
+                )}
+              </Form.Group>
+              <Button type="submit" variant="primary">
+                Begin Quiz
+              </Button>
+            </Form>
+          </Card.Body>
+        </Card>
+      ) : (
+        <>
+          <ListGroup>
+            {questions.map((question, index) => {
+              if (oneAtATimeEnabled && index !== currentQuestionIndex) {
+                return null;
+              }
 
-                  {question.questionType === "MULTIPLE_CHOICE" && (
-                    <Form>
-                      {question.multipleChoiceOptions.map((option) => (
-                        <Form.Check
-                          type="radio"
-                          name={`question-${question.id}`}
-                          key={option.id}
-                          label={option.text}
-                          checked={
-                            studentAnswer?.selectedChoiceId === option.id
-                          }
-                          onChange={() =>
-                            !readOnly &&
-                            handleSelectChoice(question.id, option.id)
-                          }
-                          disabled={readOnly}
-                          className="mb-2"
-                        />
-                      ))}
-                    </Form>
-                  )}
+              const studentAnswer = studentAnswers.find(
+                (answer) => answer.questionId === question.id
+              );
+              const evaluation = answerEvaluations?.find(
+                (result) => result.questionId === question.id
+              );
+              const isCorrect = evaluation?.isCorrect ?? null;
 
-                  {question.questionType === "TRUE_FALSE" && (
-                    <Form>
-                      <Form.Check
-                        inline
-                        type="radio"
-                        name={`tf-${question.id}`}
-                        label="True"
-                        checked={
-                          studentAnswer?.trueFalseSelection === "TRUE"
-                        }
-                        onChange={() =>
-                          !readOnly &&
-                          handleSelectTrueFalse(question.id, "TRUE")
-                        }
-                        disabled={readOnly}
-                      />
-                      <Form.Check
-                        inline
-                        type="radio"
-                        name={`tf-${question.id}`}
-                        label="False"
-                        checked={
-                          studentAnswer?.trueFalseSelection === "FALSE"
-                        }
-                        onChange={() =>
-                          !readOnly &&
-                          handleSelectTrueFalse(question.id, "FALSE")
-                        }
-                        disabled={readOnly}
-                      />
-                    </Form>
-                  )}
+              const baseReadOnly = isStudent && mode === "VIEW_LAST_ATTEMPT";
+              const lockedForThisQuestion =
+                lockAfterAnswerEnabled &&
+                lockedQuestionIds.includes(question.id) &&
+                mode === "TAKE_NEW_ATTEMPT";
+              const readOnlyForQuestion = baseReadOnly || lockedForThisQuestion;
 
-                  {question.questionType === "FILL_BLANK" && (
-                    <Form.Group>
-                      <Form.Control
-                        placeholder="Type your answer"
-                        value={studentAnswer?.fillBlankResponse ?? ""}
-                        onChange={(event) =>
-                          !readOnly &&
-                          handleFillBlankResponse(
-                            question.id,
-                            event.target.value
-                          )
-                        }
-                        disabled={readOnly}
-                      />
-                    </Form.Group>
-                  )}
+              const canShowCorrectAnswers =
+                !!evaluation &&
+                (isStaffPreview || shouldShowCorrectAnswersToStudent);
 
-                  {evaluation && (
-                    <div className="mt-3">
-                      {isCorrect ? (
-                        <Badge bg="success">Correct</Badge>
-                      ) : (
-                        <Badge bg="danger">Incorrect</Badge>
+              return (
+                <ListGroup.Item
+                  key={question.id}
+                  className="mb-3 border-0"
+                >
+                  <Card className="shadow-sm">
+                    <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                      <div>
+                        <div className="fw-semibold">
+                          Question {index + 1}: {question.title}
+                        </div>
+                        <small className="text-muted">
+                          {QUESTION_TYPE_LABELS[question.questionType]}
+                        </small>
+                        {lockedForThisQuestion && !baseReadOnly && (
+                          <span className="ms-2 badge bg-warning text-dark">
+                            Locked after answering
+                          </span>
+                        )}
+                      </div>
+                      <Badge bg="light" text="dark">
+                        {question.points} pts
+                      </Badge>
+                    </Card.Header>
+                    <Card.Body>
+                      <p>{question.prompt}</p>
+
+                      {question.questionType === "MULTIPLE_CHOICE" && (
+                        <Form>
+                          {question.multipleChoiceOptions.map((option) => (
+                            <Form.Check
+                              type="radio"
+                              name={`question-${question.id}`}
+                              key={option.id}
+                              label={option.text}
+                              checked={
+                                studentAnswer?.selectedChoiceId === option.id
+                              }
+                              onChange={() =>
+                                !readOnlyForQuestion &&
+                                handleSelectChoice(question.id, option.id)
+                              }
+                              disabled={readOnlyForQuestion}
+                              className="mb-2"
+                            />
+                          ))}
+                        </Form>
                       )}
-                      {canShowCorrectAnswers && (
-                        <div className="mt-2 small">
-                          <strong>Correct answer:</strong>{" "}
-                          {question.questionType === "MULTIPLE_CHOICE"
-                            ? question.multipleChoiceOptions
-                                .filter((option) => option.isCorrect)
-                                .map((option) => option.text)
-                                .join(", ")
-                            : question.questionType === "TRUE_FALSE"
-                            ? question.trueFalseAnswer === "TRUE"
-                              ? "True"
-                              : "False"
-                            : question.acceptableFillBlankAnswers.join(", ") ||
-                              "—"}
+
+                      {question.questionType === "TRUE_FALSE" && (
+                        <Form>
+                          <Form.Check
+                            inline
+                            type="radio"
+                            name={`tf-${question.id}`}
+                            label="True"
+                            checked={
+                              studentAnswer?.trueFalseSelection === "TRUE"
+                            }
+                            onChange={() =>
+                              !readOnlyForQuestion &&
+                              handleSelectTrueFalse(question.id, "TRUE")
+                            }
+                            disabled={readOnlyForQuestion}
+                          />
+                          <Form.Check
+                            inline
+                            type="radio"
+                            name={`tf-${question.id}`}
+                            label="False"
+                            checked={
+                              studentAnswer?.trueFalseSelection === "FALSE"
+                            }
+                            onChange={() =>
+                              !readOnlyForQuestion &&
+                              handleSelectTrueFalse(question.id, "FALSE")
+                            }
+                            disabled={readOnlyForQuestion}
+                          />
+                        </Form>
+                      )}
+
+                      {question.questionType === "FILL_BLANK" && (
+                        <Form.Group>
+                          <Form.Control
+                            placeholder="Type your answer"
+                            value={studentAnswer?.fillBlankResponse ?? ""}
+                            onChange={(event) =>
+                              !readOnlyForQuestion &&
+                              handleFillBlankResponse(
+                                question.id,
+                                event.target.value
+                              )
+                            }
+                            disabled={readOnlyForQuestion}
+                          />
+                        </Form.Group>
+                      )}
+
+                      {evaluation && (
+                        <div className="mt-3">
+                          {isCorrect ? (
+                            <Badge bg="success">Correct</Badge>
+                          ) : (
+                            <Badge bg="danger">Incorrect</Badge>
+                          )}
+                          {canShowCorrectAnswers && (
+                            <div className="mt-2 small">
+                              <strong>Correct answer:</strong>{" "}
+                              {question.questionType === "MULTIPLE_CHOICE"
+                                ? question.multipleChoiceOptions
+                                    .filter((option) => option.isCorrect)
+                                    .map((option) => option.text)
+                                    .join(", ")
+                                : question.questionType === "TRUE_FALSE"
+                                ? question.trueFalseAnswer === "TRUE"
+                                  ? "True"
+                                  : "False"
+                                : question.acceptableFillBlankAnswers.join(", ") ||
+                                  "—"}
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
-                </Card.Body>
-              </Card>
-            </ListGroup.Item>
-          );
-        })}
-      </ListGroup>
+                    </Card.Body>
+                  </Card>
+                </ListGroup.Item>
+              );
+            })}
+          </ListGroup>
 
-      {oneAtATimeEnabled && questions.length > 1 && (
-        <div className="d-flex justify-content-between align-items-center mt-3">
-          <Button
-            variant="outline-secondary"
-            size="sm"
-            disabled={currentQuestionIndex === 0}
-            onClick={() => goToQuestion(currentQuestionIndex - 1)}
-          >
-            Previous
-          </Button>
-          <div className="text-muted small">
-            Question {currentQuestionIndex + 1} of {questions.length}
-          </div>
-          <Button
-            variant="outline-secondary"
-            size="sm"
-            disabled={currentQuestionIndex === questions.length - 1}
-            onClick={() => goToQuestion(currentQuestionIndex + 1)}
-          >
-            Next
-          </Button>
-        </div>
+          {oneAtATimeEnabled && questions.length > 1 && (
+            <div className="d-flex justify-content-between align-items-center mt-3">
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                disabled={currentQuestionIndex === 0}
+                onClick={() => goToQuestion(currentQuestionIndex - 1)}
+              >
+                Previous
+              </Button>
+              <div className="text-muted small">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </div>
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                disabled={currentQuestionIndex === questions.length - 1}
+                onClick={() => goToQuestion(currentQuestionIndex + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
