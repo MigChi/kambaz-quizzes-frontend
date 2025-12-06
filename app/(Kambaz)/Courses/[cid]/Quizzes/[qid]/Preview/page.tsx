@@ -528,24 +528,51 @@ export default function QuizPreviewPage() {
   const studentOutOfAttempts =
     isStudent && hasLoadedAttempts && attemptsRemaining <= 0;
 
-  // Timer: reset whenever we start a new attempt (and timeLimit > 0) — students only
+  // === Access code requirement logic ===
+  const quizHasAccessCode =
+    !!loadedQuiz.accessCode && loadedQuiz.accessCode.trim().length > 0;
+
+  const requiresAccessCodeForStudent =
+    isStudent && quizHasAccessCode;
+
+  const showAccessCodeGate =
+    requiresAccessCodeForStudent &&
+    mode === "TAKE_NEW_ATTEMPT" &&
+    !accessCodeVerified;
+
+  // Timer: reset whenever we start a new attempt (and timeLimit > 0),
+  // BUT for students with an access code, only after it's verified.
   useEffect(() => {
     if (!loadedQuiz || !isStudent) {
       setTimeRemainingSeconds(null);
       setHasAutoSubmitted(false);
       return;
     }
+
     const limitMinutes =
       typeof loadedQuiz.timeLimit === "number" ? loadedQuiz.timeLimit : 0;
 
-    if (mode === "TAKE_NEW_ATTEMPT" && limitMinutes > 0) {
+    const accessGateSatisfied =
+      !quizHasAccessCode || accessCodeVerified;
+
+    if (
+      mode === "TAKE_NEW_ATTEMPT" &&
+      limitMinutes > 0 &&
+      accessGateSatisfied
+    ) {
       setTimeRemainingSeconds(limitMinutes * 60);
       setHasAutoSubmitted(false);
     } else {
       setTimeRemainingSeconds(null);
       setHasAutoSubmitted(false);
     }
-  }, [loadedQuiz, mode, isStudent]);
+  }, [
+    loadedQuiz,
+    mode,
+    isStudent,
+    quizHasAccessCode,
+    accessCodeVerified,
+  ]);
 
   // Timer countdown
   useEffect(() => {
@@ -619,18 +646,6 @@ export default function QuizPreviewPage() {
       </div>
     );
   }
-
-  // === Access code requirement logic ===
-  const quizHasAccessCode =
-    !!loadedQuiz.accessCode && loadedQuiz.accessCode.trim().length > 0;
-
-  const requiresAccessCodeForStudent =
-    isStudent && quizHasAccessCode;
-
-  const showAccessCodeGate =
-    requiresAccessCodeForStudent &&
-    mode === "TAKE_NEW_ATTEMPT" &&
-    !accessCodeVerified;
 
   const handleSubmit = async () => {
     // Don't allow submission if access code gate hasn't been satisfied
