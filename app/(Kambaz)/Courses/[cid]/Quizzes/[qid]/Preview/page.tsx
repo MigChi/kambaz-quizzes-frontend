@@ -401,8 +401,7 @@ export default function QuizPreviewPage() {
         answerType: stored.answerType as QuestionType,
         selectedChoiceId: stored.selectedChoiceId,
         trueFalseSelection:
-          (stored.trueFalseSelection as "TRUE" | "FALSE" | undefined) ??
-          undefined,
+          (stored.trueFalseSelection as "TRUE" | "FALSE" | undefined) ?? undefined,
         fillBlankResponse: stored.fillBlankResponse ?? "",
       };
     });
@@ -528,7 +527,6 @@ export default function QuizPreviewPage() {
   const studentOutOfAttempts =
     isStudent && hasLoadedAttempts && attemptsRemaining <= 0;
 
- 
   // === Access code requirement logic ===
   const quizAccessCode = (loadedQuiz?.accessCode ?? "").trim();
   const quizHasAccessCode = quizAccessCode.length > 0;
@@ -539,7 +537,6 @@ export default function QuizPreviewPage() {
     requiresAccessCodeForStudent &&
     mode === "TAKE_NEW_ATTEMPT" &&
     !accessCodeVerified;
-
 
   // Timer: reset whenever we start a new attempt (and timeLimit > 0),
   // BUT for students with an access code, only after it's verified.
@@ -625,28 +622,6 @@ export default function QuizPreviewPage() {
   const handleReturnToQuestions = () => {
     router.push(`/Courses/${cid}/Quizzes/${qid}/Questions`);
   };
-
-  if (!loadedQuiz && isLoadingQuiz) {
-    return (
-      <div className="text-center text-muted py-5">
-        <Spinner animation="border" role="status" className="me-2" />
-        Loading quiz preview...
-      </div>
-    );
-  }
-
-  if (!loadedQuiz) {
-    return <div className="text-muted">Quiz not found.</div>;
-  }
-
-  // Students cannot access unpublished quizzes, but TAs & Faculty can
-  if (isStudent && !loadedQuiz.published) {
-    return (
-      <div className="text-muted">
-        This quiz is not available for students.
-      </div>
-    );
-  }
 
   const handleSubmit = async () => {
     // Don't allow submission if access code gate hasn't been satisfied
@@ -736,9 +711,36 @@ export default function QuizPreviewPage() {
       return;
     }
     setHasAutoSubmitted(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     handleSubmit();
-  }, [mode, timeRemainingSeconds, hasAutoSubmitted, isStudent]);
+  }, [
+    mode,
+    timeRemainingSeconds,
+    hasAutoSubmitted,
+    isStudent,
+    handleSubmit,
+  ]);
+
+  if (!loadedQuiz && isLoadingQuiz) {
+    return (
+      <div className="text-center text-muted py-5">
+        <Spinner animation="border" role="status" className="me-2" />
+        Loading quiz preview...
+      </div>
+    );
+  }
+
+  if (!loadedQuiz) {
+    return <div className="text-muted">Quiz not found.</div>;
+  }
+
+  // Students cannot access unpublished quizzes, but TAs & Faculty can
+  if (isStudent && !loadedQuiz.published) {
+    return (
+      <div className="text-muted">
+        This quiz is not available for students.
+      </div>
+    );
+  }
 
   const timeLimitMinutes =
     typeof loadedQuiz.timeLimit === "number" ? loadedQuiz.timeLimit : 0;
@@ -851,8 +853,6 @@ export default function QuizPreviewPage() {
 
     setCurrentQuestionIndex(nextIndex);
   };
-
-  const readOnly = isStudent && mode === "VIEW_LAST_ATTEMPT";
 
   return (
     <div
