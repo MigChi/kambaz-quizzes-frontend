@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
   Badge,
@@ -16,7 +17,7 @@ import * as quizzesClient from "../../client";
 import { setQuizzes } from "../../reducer";
 import type { Quiz } from "../../reducer";
 
-type Role = "STUDENT" | "FACULTY" | "ADMIN" | string;
+type Role = "STUDENT" | "FACULTY" | "ADMIN" | "TA" | string;
 
 type CurrentUser = { _id?: string; role?: Role } | null;
 
@@ -82,6 +83,25 @@ type AnswerEvaluation = {
   earnedPoints: number;
 };
 
+type QuizAttemptRecord = {
+  _id?: string;
+  quiz: string;
+  student: string;
+  attemptNumber: number;
+  submittedAt: string;
+  score: number;
+  maxScore: number;
+  answers: {
+    questionId: string;
+    answerType: QuestionType;
+    selectedChoiceId?: string;
+    trueFalseSelection?: "TRUE" | "FALSE";
+    fillBlankResponse?: string;
+    isCorrect: boolean;
+    earnedPoints: number;
+  }[];
+};
+
 const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   MULTIPLE_CHOICE: "Multiple Choice",
   TRUE_FALSE: "True / False",
@@ -143,14 +163,21 @@ const convertBlanks = (blanks?: PersistedBlank[]): string[] => {
 };
 
 const convertQuestionForPreview = (
-  question: PersistedQuizQuestion
+  question: PersistedQuizQuestion,
+  index: number
 ): QuestionForPreview => {
   const questionType = normalizePersistedType(
     question?.type ?? question?.questionType
   );
   const prompt = question?.questionText ?? question?.question ?? "";
+
+  // Use persisted subdocument _id if present; otherwise fall back to
+  // a stable index-based ID so attempts can hydrate reliably.
+  const stableId =
+    (question as any)?._id?.toString?.() ?? `q-${index}`;
+
   return {
-    id: question?._id ?? generateStableId("question"),
+    id: stableId,
     title: question?.title ?? "Question",
     prompt,
     questionType,
@@ -167,7 +194,9 @@ const convertQuizQuestionsForPreview = (
   if (!quiz?.questions) {
     return [];
   }
-  return quiz.questions.map((question) => convertQuestionForPreview(question));
+  return quiz.questions.map((question, index) =>
+    convertQuestionForPreview(question, index)
+  );
 };
 
 const computeInitialAnswers = (
@@ -177,7 +206,8 @@ const computeInitialAnswers = (
     questionId: question.id,
     answerType: question.questionType,
     selectedChoiceId: undefined,
-    trueFalseSelection: question.questionType === "TRUE_FALSE" ? "TRUE" : undefined,
+    // Don't pre-select True/False; start unanswered
+    trueFalseSelection: undefined,
     fillBlankResponse: "",
   }));
 
@@ -202,7 +232,9 @@ const evaluateAnswers = (
     } else if (question.questionType === "TRUE_FALSE") {
       isCorrect = answer.trueFalseSelection === question.trueFalseAnswer;
     } else {
-      const studentResponse = (answer.fillBlankResponse ?? "").trim().toLowerCase();
+      const studentResponse = (answer.fillBlankResponse ?? "")
+        .trim()
+        .toLowerCase();
       isCorrect = question.acceptableFillBlankAnswers.some(
         (acceptable) => acceptable.trim().toLowerCase() === studentResponse
       );
@@ -215,21 +247,42 @@ const evaluateAnswers = (
     };
   });
 
-const computeScoreSummary = (evaluations: AnswerEvaluation[]) => {
+const computeScoreSummary = (
+  evaluations: AnswerEvaluation[],
+  questions: QuestionForPreview[]
+) => {
   const earnedPoints = evaluations.reduce(
     (sum, evaluation) => sum + evaluation.earnedPoints,
     0
   );
-  const maxPoints = evaluations.reduce(
-    (sum, evaluation) =>
-      sum + (evaluation.earnedPoints > 0 ? evaluation.earnedPoints : 0),
-    earnedPoints
+  const maxPoints = questions.reduce(
+    (sum, question) => sum + question.points,
+    0
   );
   return { earnedPoints, maxPoints };
 };
 
+const isQuestionAnswered = (
+  question: QuestionForPreview,
+  answer?: StudentAnswer
+): boolean => {
+  if (!answer) return false;
+  if (question.questionType === "MULTIPLE_CHOICE") {
+    return !!answer.selectedChoiceId;
+  }
+  if (question.questionType === "TRUE_FALSE") {
+    return !!answer.trueFalseSelection;
+  }
+  return !!answer.fillBlankResponse && answer.fillBlankResponse.trim().length > 0;
+};
+
 export default function QuizPreviewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const modeParam = searchParams.get("mode");
+  const initialIntent: "start" | "review" =
+    modeParam === "review" ? "review" : "start";
+
   const { cid, qid } = useParams<{ cid: string; qid: string }>();
   const dispatch = useDispatch();
 
@@ -239,7 +292,10 @@ export default function QuizPreviewPage() {
   );
 
   const quizFromStore = useMemo<QuizWithQuestions | undefined>(
-    () => quizzes.find((quiz) => quiz._id === qid) as QuizWithQuestions | undefined,
+    () =>
+      quizzes.find((quiz) => quiz._id === qid) as
+        | QuizWithQuestions
+        | undefined,
     [quizzes, qid]
   );
 
@@ -258,9 +314,28 @@ export default function QuizPreviewPage() {
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isFaculty =
-    currentUser?.role === "FACULTY" || currentUser?.role === "ADMIN";
+  const [attempts, setAttempts] = useState<QuizAttemptRecord[]>([]);
+  const [isLoadingAttempts, setIsLoadingAttempts] = useState(false);
+  const [hasLoadedAttempts, setHasLoadedAttempts] = useState(false);
 
+  const [mode, setMode] = useState<"VIEW_LAST_ATTEMPT" | "TAKE_NEW_ATTEMPT">(
+    initialIntent === "review" ? "VIEW_LAST_ATTEMPT" : "TAKE_NEW_ATTEMPT"
+  );
+
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [lockedQuestionIds, setLockedQuestionIds] = useState<string[]>([]);
+
+  const [timeRemainingSeconds, setTimeRemainingSeconds] = useState<number | null>(
+    null
+  );
+  const [hasAutoSubmitted, setHasAutoSubmitted] = useState(false);
+
+  const role = currentUser?.role;
+  const isStudent = role === "STUDENT";
+  const isFaculty = role === "FACULTY" || role === "ADMIN";
+  const isStaffPreview = !isStudent; // faculty or TA
+
+  // Load quiz if direct nav
   useEffect(() => {
     if (!qid || quizFromStore) return;
     const loadQuiz = async () => {
@@ -270,10 +345,12 @@ export default function QuizPreviewPage() {
           qid
         )) as QuizWithQuestions;
         setLoadedQuiz(fetchedQuiz);
-        setQuestions(convertQuizQuestionsForPreview(fetchedQuiz));
-        setStudentAnswers(
-          computeInitialAnswers(convertQuizQuestionsForPreview(fetchedQuiz))
-        );
+        const previewQuestions = convertQuizQuestionsForPreview(fetchedQuiz);
+        setQuestions(previewQuestions);
+        setStudentAnswers(computeInitialAnswers(previewQuestions));
+        setCurrentQuestionIndex(0);
+        setLockedQuestionIds([]);
+        setAnswerEvaluations(null);
         dispatch(setQuizzes([fetchedQuiz]));
       } catch (err) {
         console.error("Failed to load quiz:", err);
@@ -284,19 +361,199 @@ export default function QuizPreviewPage() {
     loadQuiz();
   }, [qid, quizFromStore, dispatch]);
 
+  // Keep local quiz/questions in sync with store
   useEffect(() => {
-    if (quizFromStore) {
-      setLoadedQuiz(quizFromStore);
-      const previewQuestions = convertQuizQuestionsForPreview(quizFromStore);
-      setQuestions(previewQuestions);
-      setStudentAnswers(computeInitialAnswers(previewQuestions));
-    }
+    if (!quizFromStore) return;
+    setLoadedQuiz(quizFromStore);
+    const previewQuestions = convertQuizQuestionsForPreview(quizFromStore);
+    setQuestions(previewQuestions);
+    setStudentAnswers(computeInitialAnswers(previewQuestions));
+    setCurrentQuestionIndex(0);
+    setLockedQuestionIds([]);
+    setAnswerEvaluations(null);
   }, [quizFromStore]);
+
+  const hydrateFromAttempt = (
+    attempt: QuizAttemptRecord,
+    baseQuestions: QuestionForPreview[]
+  ) => {
+    const hydratedAnswers: StudentAnswer[] = baseQuestions.map((question) => {
+      const stored = attempt.answers.find(
+        (a) => a.questionId === question.id
+      );
+      if (!stored) {
+        return {
+          questionId: question.id,
+          answerType: question.questionType,
+          selectedChoiceId: undefined,
+          trueFalseSelection: undefined,
+          fillBlankResponse: "",
+        };
+      }
+      return {
+        questionId: question.id,
+        answerType: stored.answerType as QuestionType,
+        selectedChoiceId: stored.selectedChoiceId,
+        trueFalseSelection:
+          (stored.trueFalseSelection as "TRUE" | "FALSE" | undefined) ??
+          undefined,
+        fillBlankResponse: stored.fillBlankResponse ?? "",
+      };
+    });
+
+    const hydratedEvaluations: AnswerEvaluation[] = baseQuestions.map(
+      (question) => {
+        const stored = attempt.answers.find(
+          (a) => a.questionId === question.id
+        );
+        if (!stored) {
+          return {
+            questionId: question.id,
+            isCorrect: false,
+            earnedPoints: 0,
+          };
+        }
+        return {
+          questionId: question.id,
+          isCorrect: Boolean(stored.isCorrect),
+          earnedPoints: Number(stored.earnedPoints ?? 0),
+        };
+      }
+    );
+
+    setStudentAnswers(hydratedAnswers);
+    setAnswerEvaluations(hydratedEvaluations);
+    setCurrentQuestionIndex(0);
+    setLockedQuestionIds([]);
+  };
+
+  // Load attempts for STUDENT
+  useEffect(() => {
+    const loadAttempts = async () => {
+      if (!isStudent) return;
+      if (!qid || !currentUser?._id) return;
+      if (!loadedQuiz) return;
+      if (!questions.length) return;
+      if (hasLoadedAttempts) return;
+
+      try {
+        setIsLoadingAttempts(true);
+        const data =
+          (await quizzesClient.findAttemptsForQuizAndStudent(
+            qid,
+            currentUser._id
+          )) ?? [];
+        const arr: QuizAttemptRecord[] = Array.isArray(data) ? data : [];
+        arr.sort(
+          (a, b) =>
+            (a.attemptNumber ?? 0) - (b.attemptNumber ?? 0) ||
+            new Date(a.submittedAt).getTime() -
+              new Date(b.submittedAt).getTime()
+        );
+        setAttempts(arr);
+
+        if (arr.length > 0) {
+          const last = arr[arr.length - 1];
+
+          const multipleAttemptsEnabled =
+            (loadedQuiz.multipleAttempts ?? "No")
+              .toString()
+              .toUpperCase() === "YES";
+          const allowed =
+            typeof loadedQuiz.allowedAttempts === "number" &&
+            loadedQuiz.allowedAttempts > 0
+              ? loadedQuiz.allowedAttempts
+              : 1;
+          const maxAttempts = multipleAttemptsEnabled ? allowed : 1;
+          const attemptsRemaining = Math.max(0, maxAttempts - arr.length);
+          const outOfAttempts = attemptsRemaining <= 0;
+
+          if (initialIntent === "review" || outOfAttempts) {
+            hydrateFromAttempt(last, questions);
+            setMode("VIEW_LAST_ATTEMPT");
+          } else {
+            // initialIntent === "start" and there ARE attempts left:
+            // stay in TAKE_NEW_ATTEMPT, leave answers blank
+            setAnswerEvaluations(null);
+            setMode("TAKE_NEW_ATTEMPT");
+          }
+        } else {
+          // no attempts: always start fresh
+          setAnswerEvaluations(null);
+          setMode("TAKE_NEW_ATTEMPT");
+        }
+
+        setHasLoadedAttempts(true);
+      } catch (err) {
+        console.error("Failed to load quiz attempts:", err);
+      } finally {
+        setIsLoadingAttempts(false);
+      }
+    };
+    loadAttempts();
+  }, [
+    isStudent,
+    qid,
+    currentUser,
+    loadedQuiz,
+    questions,
+    hasLoadedAttempts,
+    initialIntent,
+  ]);
 
   const totalPoints = useMemo(
     () => questions.reduce((sum, question) => sum + question.points, 0),
     [questions]
   );
+
+  const attemptsCount = isStudent ? attempts.length : 0;
+  const multipleAttemptsEnabled =
+    loadedQuiz && typeof loadedQuiz.multipleAttempts === "string"
+      ? loadedQuiz.multipleAttempts.toUpperCase() === "YES"
+      : false;
+  const allowedAttempts =
+    loadedQuiz &&
+    typeof loadedQuiz.allowedAttempts === "number" &&
+    loadedQuiz.allowedAttempts > 0
+      ? loadedQuiz.allowedAttempts
+      : 1;
+  const maxAttempts = multipleAttemptsEnabled ? allowedAttempts : 1;
+  const attemptsRemaining = Math.max(0, maxAttempts - attemptsCount);
+  const studentOutOfAttempts =
+    isStudent && hasLoadedAttempts && attemptsRemaining <= 0;
+
+  // Timer: reset whenever we start a new attempt (and timeLimit > 0)
+  useEffect(() => {
+    if (!loadedQuiz) {
+      setTimeRemainingSeconds(null);
+      setHasAutoSubmitted(false);
+      return;
+    }
+    const limitMinutes =
+      typeof loadedQuiz.timeLimit === "number" ? loadedQuiz.timeLimit : 0;
+
+    if (mode === "TAKE_NEW_ATTEMPT" && limitMinutes > 0) {
+      setTimeRemainingSeconds(limitMinutes * 60);
+      setHasAutoSubmitted(false);
+    } else {
+      setTimeRemainingSeconds(null);
+      setHasAutoSubmitted(false);
+    }
+  }, [loadedQuiz, mode]);
+
+  // Timer countdown
+  useEffect(() => {
+    if (timeRemainingSeconds === null) return;
+    if (timeRemainingSeconds <= 0) return;
+
+    const intervalId = setInterval(() => {
+      setTimeRemainingSeconds((prev) =>
+        prev === null || prev <= 0 ? prev : prev - 1
+      );
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [timeRemainingSeconds]);
 
   const handleSelectChoice = (questionId: string, choiceId: string) => {
     setStudentAnswers((previous) =>
@@ -331,13 +588,6 @@ export default function QuizPreviewPage() {
     );
   };
 
-  const handleSubmitPreview = () => {
-    setIsSubmitting(true);
-    const evaluations = evaluateAnswers(questions, studentAnswers);
-    setAnswerEvaluations(evaluations);
-    setIsSubmitting(false);
-  };
-
   const handleReturnToQuestions = () => {
     router.push(`/Courses/${cid}/Quizzes/${qid}/Questions`);
   };
@@ -355,42 +605,207 @@ export default function QuizPreviewPage() {
     return <div className="text-muted">Quiz not found.</div>;
   }
 
-  const scoreSummary = answerEvaluations
-    ? {
-        earned: answerEvaluations.reduce(
-          (sum, evaluation) => sum + evaluation.earnedPoints,
-          0
-        ),
-        possible: questions.reduce((sum, question) => sum + question.points, 0),
+  // Students cannot access unpublished quizzes, but TAs & Faculty can
+  if (isStudent && !loadedQuiz.published) {
+    return (
+      <div className="text-muted">
+        This quiz is not available for students.
+      </div>
+    );
+  }
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const evaluations = evaluateAnswers(questions, studentAnswers);
+      setAnswerEvaluations(evaluations);
+
+      if (!isStudent) {
+        // Faculty / TA: preview only, no persistence
+        return;
       }
-    : null;
+
+      // STUDENT: don't submit until we know attempts status
+      if (!hasLoadedAttempts) {
+        return;
+      }
+
+      if (studentOutOfAttempts) {
+        return;
+      }
+
+      if (!currentUser?._id || !qid) {
+        return;
+      }
+
+      const { earnedPoints, maxPoints } = computeScoreSummary(
+        evaluations,
+        questions
+      );
+
+      const payload = {
+        score: earnedPoints,
+        maxScore: maxPoints,
+        answers: questions.map((question) => {
+          const ans = studentAnswers.find(
+            (a) => a.questionId === question.id
+          );
+          const evalResult = evaluations.find(
+            (ev) => ev.questionId === question.id
+          );
+          return {
+            questionId: question.id,
+            answerType: question.questionType,
+            selectedChoiceId: ans?.selectedChoiceId,
+            trueFalseSelection: ans?.trueFalseSelection,
+            fillBlankResponse: ans?.fillBlankResponse ?? "",
+            isCorrect: evalResult?.isCorrect ?? false,
+            earnedPoints: evalResult?.earnedPoints ?? 0,
+          };
+        }),
+      };
+
+      const created =
+        await quizzesClient.createAttemptForQuizAndStudent(
+          qid,
+          currentUser._id,
+          payload
+        );
+
+      setAttempts((prev) => [...prev, created]);
+      setMode("VIEW_LAST_ATTEMPT");
+    } catch (err) {
+      console.error("Failed to submit quiz attempt:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Auto-submit when time runs out (for active attempts only)
+  useEffect(() => {
+    if (
+      mode !== "TAKE_NEW_ATTEMPT" ||
+      timeRemainingSeconds === null ||
+      timeRemainingSeconds > 0 ||
+      hasAutoSubmitted
+    ) {
+      return;
+    }
+    setHasAutoSubmitted(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    handleSubmit();
+  }, [mode, timeRemainingSeconds, hasAutoSubmitted]);
+
+  const timeLimitMinutes =
+    typeof loadedQuiz.timeLimit === "number" ? loadedQuiz.timeLimit : 0;
+
+  const oneAtATimeEnabled =
+    (loadedQuiz.oneQuestionAtATime ?? "Yes")
+      .toString()
+      .toUpperCase() === "YES";
+
+  const lockAfterAnswerEnabled =
+    oneAtATimeEnabled &&
+    (loadedQuiz.lockQuestionsAfterAnswering ?? "No")
+      .toString()
+      .toUpperCase() === "YES";
+
+  const showCorrectAnswersRaw = (
+    loadedQuiz.showCorrectAnswers || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  const dueDateString = loadedQuiz.dueDate ?? null;
+  let dueDatePassed = false;
+  if (dueDateString) {
+    const d = new Date(dueDateString);
+    if (!Number.isNaN(d.getTime())) {
+      const now = new Date();
+      dueDatePassed = now.getTime() > d.getTime();
+    }
+  }
+
+  const shouldShowCorrectAnswersToStudent =
+    !!answerEvaluations &&
+    (showCorrectAnswersRaw === "yes" ||
+      showCorrectAnswersRaw.includes("immediately") ||
+      showCorrectAnswersRaw.includes("always") ||
+      (showCorrectAnswersRaw.includes("after") && dueDatePassed));
+
+  const scoreSummary =
+    answerEvaluations && questions.length
+      ? computeScoreSummary(answerEvaluations, questions)
+      : null;
 
   const renderSummaryBanner = () => {
     if (!answerEvaluations || !scoreSummary) return null;
     const percentage =
-      scoreSummary.possible === 0
+      scoreSummary.maxPoints === 0
         ? 0
-        : Math.round((scoreSummary.earned / scoreSummary.possible) * 100);
+        : Math.round(
+            (scoreSummary.earnedPoints / scoreSummary.maxPoints) * 100
+          );
+
     return (
-      <Alert variant="info" className="d-flex justify-content-between align-items-center">
+      <Alert
+        variant="info"
+        className="d-flex justify-content-between align-items-center"
+      >
         <div>
           Score:{" "}
           <Badge bg="primary">
-            {scoreSummary.earned} / {scoreSummary.possible}
+            {scoreSummary.earnedPoints} / {scoreSummary.maxPoints}
           </Badge>{" "}
           ({percentage}%)
+          {isStudent && (
+            <>
+              {" "}
+              · Attempt {attemptsCount} of {maxAttempts}
+            </>
+          )}
         </div>
-        <div>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            onClick={() => setAnswerEvaluations(null)}
-          >
-            Retake Preview
-          </Button>
-        </div>
+        {!isStudent && (
+          <div>
+            <Button
+              size="sm"
+              variant="outline-secondary"
+              onClick={() => {
+                setAnswerEvaluations(null);
+                setStudentAnswers(computeInitialAnswers(questions));
+                setMode("TAKE_NEW_ATTEMPT");
+                setLockedQuestionIds([]);
+                setCurrentQuestionIndex(0);
+              }}
+            >
+              Retake Preview
+            </Button>
+          </div>
+        )}
       </Alert>
     );
+  };
+
+  const goToQuestion = (nextIndex: number) => {
+    if (!oneAtATimeEnabled) return;
+    if (nextIndex < 0 || nextIndex >= questions.length) return;
+
+    if (lockAfterAnswerEnabled && mode === "TAKE_NEW_ATTEMPT") {
+      const currentQuestion = questions[currentQuestionIndex];
+      const currentAnswer = studentAnswers.find(
+        (a) => a.questionId === currentQuestion.id
+      );
+      if (
+        currentQuestion &&
+        currentAnswer &&
+        isQuestionAnswered(currentQuestion, currentAnswer) &&
+        !lockedQuestionIds.includes(currentQuestion.id)
+      ) {
+        setLockedQuestionIds((prev) => [...prev, currentQuestion.id]);
+      }
+    }
+
+    setCurrentQuestionIndex(nextIndex);
   };
 
   return (
@@ -405,20 +820,91 @@ export default function QuizPreviewPage() {
           <div className="text-muted small">
             {loadedQuiz.questions?.length ?? 0} questions · {totalPoints} points
           </div>
+          {timeLimitMinutes > 0 &&
+            mode === "TAKE_NEW_ATTEMPT" &&
+            timeRemainingSeconds !== null && (
+              <div className="text-muted small">
+                Time remaining:{" "}
+                {Math.floor(timeRemainingSeconds / 60)}:
+                {String(timeRemainingSeconds % 60).padStart(2, "0")}
+              </div>
+            )}
+          {isStudent && (
+            <div className="text-muted small">
+              Attempts used: {attemptsCount} / {maxAttempts}
+              {isLoadingAttempts && " (loading...)"}
+              {studentOutOfAttempts && hasLoadedAttempts && (
+                <span className="text-danger ms-2">
+                  No attempts remaining
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="d-flex gap-2 flex-wrap">
           {isFaculty && (
-            <Button variant="outline-secondary" onClick={handleReturnToQuestions}>
+            <Button
+              variant="outline-secondary"
+              onClick={handleReturnToQuestions}
+            >
               Edit Questions
             </Button>
           )}
-          <Button
-            variant="danger"
-            onClick={handleSubmitPreview}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Submitting..." : "Submit Preview"}
-          </Button>
+
+          {/* STAFF (Faculty / TA) preview button */}
+          {isStaffPreview && (
+            <Button
+              variant="danger"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Submit Preview"}
+            </Button>
+          )}
+
+          {/* STUDENT buttons */}
+          {isStudent && mode === "VIEW_LAST_ATTEMPT" && (
+            <>
+              {attemptsCount > 0 && scoreSummary && (
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  disabled
+                >
+                  Last score: {scoreSummary.earnedPoints} /{" "}
+                  {scoreSummary.maxPoints}
+                </Button>
+              )}
+              {attemptsRemaining > 0 && hasLoadedAttempts && (
+                <Button
+                  variant="danger"
+                  onClick={() => {
+                    setMode("TAKE_NEW_ATTEMPT");
+                    setStudentAnswers(computeInitialAnswers(questions));
+                    setAnswerEvaluations(null);
+                    setLockedQuestionIds([]);
+                    setCurrentQuestionIndex(0);
+                  }}
+                >
+                  Retake Quiz
+                </Button>
+              )}
+            </>
+          )}
+
+          {isStudent && mode === "TAKE_NEW_ATTEMPT" && (
+            <Button
+              variant="danger"
+              onClick={handleSubmit}
+              disabled={
+                isSubmitting ||
+                !hasLoadedAttempts ||
+                studentOutOfAttempts
+              }
+            >
+              {isSubmitting ? "Submitting..." : "Submit Quiz"}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -426,6 +912,10 @@ export default function QuizPreviewPage() {
 
       <ListGroup>
         {questions.map((question, index) => {
+          if (oneAtATimeEnabled && index !== currentQuestionIndex) {
+            return null;
+          }
+
           const studentAnswer = studentAnswers.find(
             (answer) => answer.questionId === question.id
           );
@@ -434,8 +924,22 @@ export default function QuizPreviewPage() {
           );
           const isCorrect = evaluation?.isCorrect ?? null;
 
+          const baseReadOnly = isStudent && mode === "VIEW_LAST_ATTEMPT";
+          const lockedForThisQuestion =
+            lockAfterAnswerEnabled &&
+            lockedQuestionIds.includes(question.id) &&
+            mode === "TAKE_NEW_ATTEMPT";
+          const readOnly = baseReadOnly || lockedForThisQuestion;
+
+          const canShowCorrectAnswers =
+            !!evaluation &&
+            (isStaffPreview || shouldShowCorrectAnswersToStudent);
+
           return (
-            <ListGroup.Item key={question.id} className="mb-3 border-0">
+            <ListGroup.Item
+              key={question.id}
+              className="mb-3 border-0"
+            >
               <Card className="shadow-sm">
                 <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <div>
@@ -445,6 +949,11 @@ export default function QuizPreviewPage() {
                     <small className="text-muted">
                       {QUESTION_TYPE_LABELS[question.questionType]}
                     </small>
+                    {lockedForThisQuestion && !baseReadOnly && (
+                      <span className="ms-2 badge bg-warning text-dark">
+                        Locked after answering
+                      </span>
+                    )}
                   </div>
                   <Badge bg="light" text="dark">
                     {question.points} pts
@@ -461,10 +970,14 @@ export default function QuizPreviewPage() {
                           name={`question-${question.id}`}
                           key={option.id}
                           label={option.text}
-                          checked={studentAnswer?.selectedChoiceId === option.id}
+                          checked={
+                            studentAnswer?.selectedChoiceId === option.id
+                          }
                           onChange={() =>
+                            !readOnly &&
                             handleSelectChoice(question.id, option.id)
                           }
+                          disabled={readOnly}
                           className="mb-2"
                         />
                       ))}
@@ -478,16 +991,28 @@ export default function QuizPreviewPage() {
                         type="radio"
                         name={`tf-${question.id}`}
                         label="True"
-                        checked={studentAnswer?.trueFalseSelection === "TRUE"}
-                        onChange={() => handleSelectTrueFalse(question.id, "TRUE")}
+                        checked={
+                          studentAnswer?.trueFalseSelection === "TRUE"
+                        }
+                        onChange={() =>
+                          !readOnly &&
+                          handleSelectTrueFalse(question.id, "TRUE")
+                        }
+                        disabled={readOnly}
                       />
                       <Form.Check
                         inline
                         type="radio"
                         name={`tf-${question.id}`}
                         label="False"
-                        checked={studentAnswer?.trueFalseSelection === "FALSE"}
-                        onChange={() => handleSelectTrueFalse(question.id, "FALSE")}
+                        checked={
+                          studentAnswer?.trueFalseSelection === "FALSE"
+                        }
+                        onChange={() =>
+                          !readOnly &&
+                          handleSelectTrueFalse(question.id, "FALSE")
+                        }
+                        disabled={readOnly}
                       />
                     </Form>
                   )}
@@ -498,8 +1023,13 @@ export default function QuizPreviewPage() {
                         placeholder="Type your answer"
                         value={studentAnswer?.fillBlankResponse ?? ""}
                         onChange={(event) =>
-                          handleFillBlankResponse(question.id, event.target.value)
+                          !readOnly &&
+                          handleFillBlankResponse(
+                            question.id,
+                            event.target.value
+                          )
                         }
+                        disabled={readOnly}
                       />
                     </Form.Group>
                   )}
@@ -511,19 +1041,22 @@ export default function QuizPreviewPage() {
                       ) : (
                         <Badge bg="danger">Incorrect</Badge>
                       )}
-                      <div className="mt-2 small">
-                        <strong>Correct answer:</strong>{" "}
-                        {question.questionType === "MULTIPLE_CHOICE"
-                          ? question.multipleChoiceOptions
-                              .filter((option) => option.isCorrect)
-                              .map((option) => option.text)
-                              .join(", ")
-                          : question.questionType === "TRUE_FALSE"
-                          ? question.trueFalseAnswer === "TRUE"
-                            ? "True"
-                            : "False"
-                          : question.acceptableFillBlankAnswers.join(", ") || "—"}
-                      </div>
+                      {canShowCorrectAnswers && (
+                        <div className="mt-2 small">
+                          <strong>Correct answer:</strong>{" "}
+                          {question.questionType === "MULTIPLE_CHOICE"
+                            ? question.multipleChoiceOptions
+                                .filter((option) => option.isCorrect)
+                                .map((option) => option.text)
+                                .join(", ")
+                            : question.questionType === "TRUE_FALSE"
+                            ? question.trueFalseAnswer === "TRUE"
+                              ? "True"
+                              : "False"
+                            : question.acceptableFillBlankAnswers.join(", ") ||
+                              "—"}
+                        </div>
+                      )}
                     </div>
                   )}
                 </Card.Body>
@@ -532,6 +1065,30 @@ export default function QuizPreviewPage() {
           );
         })}
       </ListGroup>
+
+      {oneAtATimeEnabled && questions.length > 1 && (
+        <div className="d-flex justify-content-between align-items-center mt-3">
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            disabled={currentQuestionIndex === 0}
+            onClick={() => goToQuestion(currentQuestionIndex - 1)}
+          >
+            Previous
+          </Button>
+          <div className="text-muted small">
+            Question {currentQuestionIndex + 1} of {questions.length}
+          </div>
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            disabled={currentQuestionIndex === questions.length - 1}
+            onClick={() => goToQuestion(currentQuestionIndex + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

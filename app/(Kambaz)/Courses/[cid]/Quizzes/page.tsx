@@ -67,10 +67,14 @@ export default function QuizzesPage() {
   const dispatch = useDispatch();
   const { quizzes } = useSelector((s: RootState) => s.quizzesReducer);
   const { currentUser } = useSelector((s: RootState) => s.accountReducer);
-
   const isFaculty =
     currentUser?.role === "FACULTY" || currentUser?.role === "ADMIN";
   const isStudent = currentUser?.role === "STUDENT";
+
+  const [attemptSummaries, setAttemptSummaries] = useState<
+    Record<string, { score: number; maxScore: number } | null>
+  >({});
+  const [loadingScores, setLoadingScores] = useState(false);  
 
   const [sortBy, setSortBy] = useState<
     "DEFAULT" | "TITLE" | "DUE" | "AVAILABLE"
@@ -89,6 +93,54 @@ export default function QuizzesPage() {
     };
     load();
   }, [cid, dispatch]);
+
+  useEffect(() => {
+    const loadScores = async () => {
+      if (!isStudent || !currentUser?._id) return;
+      if (!Array.isArray(quizzes) || quizzes.length === 0) return;
+
+      try {
+        setLoadingScores(true);
+        const summaries: Record<string, { score: number; maxScore: number } | null> = {};
+        await Promise.all(
+          quizzes.map(async (quiz: Quiz) => {
+            try {
+              const attempts =
+                (await client.findAttemptsForQuizAndStudent(
+                  quiz._id,
+                  currentUser._id
+                )) ?? [];
+              if (Array.isArray(attempts) && attempts.length > 0) {
+                const sorted = [...attempts].sort(
+                  (a: any, b: any) =>
+                    (a.attemptNumber ?? 0) - (b.attemptNumber ?? 0) ||
+                    new Date(a.submittedAt).getTime() -
+                      new Date(b.submittedAt).getTime()
+                );
+                const last = sorted[sorted.length - 1];
+                summaries[quiz._id] = {
+                  score: Number(last.score ?? 0),
+                  maxScore: Number(last.maxScore ?? (quiz.points ?? 0)),
+                };
+              } else {
+                summaries[quiz._id] = null;
+              }
+            } catch (err) {
+              console.error("Failed to load attempts for quiz", quiz._id, err);
+              summaries[quiz._id] = null;
+            }
+          })
+        );
+        setAttemptSummaries(summaries);
+      } catch (err) {
+        console.error("Failed to load quiz scores:", err);
+      } finally {
+        setLoadingScores(false);
+      }
+    };
+    loadScores();
+  }, [isStudent, currentUser?._id, quizzes]);
+
 
   const sortedQuizzes: Quiz[] = useMemo(() => {
     const all = Array.isArray(quizzes) ? quizzes.filter(Boolean) : [];
@@ -189,7 +241,7 @@ export default function QuizzesPage() {
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2>Quizzes</h2>
 
-        {isFaculty && (
+        {(isFaculty ||  currentUser?.role === "TA") && (
           <div className="d-flex gap-2">
             <DropdownButton
               id="wd-quizzes-sort"
@@ -312,7 +364,14 @@ export default function QuizzesPage() {
                       {currentUser?.role === "STUDENT" && (
                         <>
                           {" "}
-                          | <b>Score</b> --
+                          | <b>Score</b>{" "}
+                          {attemptSummaries[quiz._id]
+                            ? `${attemptSummaries[quiz._id]!.score} / ${
+                                attemptSummaries[quiz._id]!.maxScore
+                              }`
+                            : loadingScores
+                            ? "Loading..."
+                            : "--"}
                         </>
                       )}
                     </div>

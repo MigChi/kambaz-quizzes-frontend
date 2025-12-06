@@ -19,6 +19,14 @@ export default function QuizDetailsPage() {
   const [localQuiz, setLocalQuiz] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [attemptsInfo, setAttemptsInfo] = useState<{
+    attemptsCount: number;
+    lastScore?: number;
+    lastMaxScore?: number;
+  } | null>(null);
+  const [loadingAttempts, setLoadingAttempts] = useState(false);
+  
+
   const quizFromStore = useMemo(
     () => quizzes?.find((q: any) => q._id === qid),
     [quizzes, qid]
@@ -48,16 +56,75 @@ export default function QuizDetailsPage() {
     load();
   }, [qid, quizFromStore]);
 
+  useEffect(() => {
+    const loadAttempts = async () => {
+      if (!qid) return;
+      if (!currentUser?._id || currentUser.role !== "STUDENT") return;
+
+      try {
+        setLoadingAttempts(true);
+        const data = await client.findAttemptsForQuizAndStudent(
+          qid,
+          currentUser._id
+        );
+        const arr = Array.isArray(data) ? data : [];
+        if (arr.length === 0) {
+          setAttemptsInfo({ attemptsCount: 0 });
+        } else {
+          const sorted = [...arr].sort(
+            (a: any, b: any) =>
+              (a.attemptNumber ?? 0) - (b.attemptNumber ?? 0) ||
+              new Date(a.submittedAt).getTime() -
+                new Date(b.submittedAt).getTime()
+          );
+          const last = sorted[sorted.length - 1];
+          setAttemptsInfo({
+            attemptsCount: sorted.length,
+            lastScore: Number(last.score ?? 0),
+            lastMaxScore: Number(last.maxScore ?? 0),
+          });
+        }
+      } catch (e) {
+        console.error("Failed to load quiz attempts:", e);
+      } finally {
+        setLoadingAttempts(false);
+      }
+    };
+    loadAttempts();
+  }, [qid, currentUser]);
+
   const role = currentUser?.role;
   const isFaculty = role === "FACULTY" || role === "ADMIN";
   const isStudent = role === "STUDENT";
   const isTA = role === "TA";
+  // Attempt/limit logic (students only)
+  const attemptsCount = attemptsInfo?.attemptsCount ?? 0;
+  const multipleAttemptsEnabled =
+    quiz && typeof quiz.multipleAttempts === "string"
+      ? quiz.multipleAttempts.toUpperCase() === "YES"
+      : false;
+  const allowedAttempts =
+    quiz && typeof quiz.allowedAttempts === "number" && quiz.allowedAttempts > 0
+      ? quiz.allowedAttempts
+      : 1;
+  const maxAttempts = multipleAttemptsEnabled ? allowedAttempts : 1;
+  const attemptsRemaining = Math.max(0, maxAttempts - attemptsCount);
+  const outOfAttempts = attemptsRemaining <= 0;
+
 
   const onStartQuiz = () => {
-    // Placeholder for quiz-taking
-    // eslint-disable-next-line no-alert
-    alert("Starting quiz (placeholder)...");
+    if (!cid || !qid) return;
+    // Explicitly tell the preview page this is a new attempt
+    router.push(`/Courses/${cid}/Quizzes/${qid}/Preview?mode=start`);
   };
+
+  const onReviewAnswers = () => {
+    if (!cid || !qid) return;
+    // Explicitly tell the preview page to show the last attempt
+    router.push(`/Courses/${cid}/Quizzes/${qid}/Preview?mode=review`);
+  };
+
+
 
   if (loading && !quiz) {
     return <div className="text-muted">Loading quiz...</div>;
@@ -109,15 +176,48 @@ export default function QuizDetailsPage() {
         )}
 
         {isStudent && (
-          <Button
-            variant="primary"
-            id="wd-start-quiz"
-            onClick={onStartQuiz}
-          >
-            Start Quiz
-          </Button>
+          <>
+            {/* Review Answers button when there's at least one attempt */}
+            {attemptsInfo?.attemptsCount && attemptsInfo.attemptsCount > 0 && (
+              <Button
+                variant="outline-secondary"
+                id="wd-review-quiz"
+                onClick={onReviewAnswers}
+                disabled={loadingAttempts}
+              >
+                Review Answers
+              </Button>
+            )}
+
+            {/* Start Quiz:
+                - shown if no attempts yet
+                - or if there are attempts left
+                - hidden if out of attempts */}
+            {attemptsInfo ? (
+              !outOfAttempts && (
+                <Button
+                  variant="primary"
+                  id="wd-start-quiz"
+                  onClick={onStartQuiz}
+                  disabled={loadingAttempts}
+                >
+                  Start Quiz
+                </Button>
+              )
+            ) : (
+              // While attempts are loading, show disabled Start button
+              <Button
+                variant="primary"
+                id="wd-start-quiz"
+                disabled
+              >
+                {loadingAttempts ? "Loading..." : "Start Quiz"}
+              </Button>
+            )}
+          </>
         )}
       </div>
+
 
       {/* Title + description */}
       <h2 className="fw-bold mb-2">{quiz.title || "Quiz"}</h2>
@@ -125,6 +225,15 @@ export default function QuizDetailsPage() {
         <p className="text-muted">{quiz.description}</p>
       )}
       <hr />
+
+      {isStudent && attemptsInfo && attemptsInfo.attemptsCount > 0 && (
+        <div className="small text-muted mb-2">
+          Last attempt:{" "}
+          {attemptsInfo.lastScore} / {attemptsInfo.lastMaxScore ?? quiz.points ?? 0}
+          {loadingAttempts && " (updating...)"}
+        </div>
+      )}
+
 
       {/* Summary of quiz properties, read-only */}
       <h4 className="mb-3">Quiz Details</h4>
