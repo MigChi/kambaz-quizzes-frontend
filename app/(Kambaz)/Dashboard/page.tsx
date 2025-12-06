@@ -43,7 +43,7 @@ export default function Dashboard() {
 
     try {
       // Try server-side "current user" endpoint first (uses session/cookies)
-      const courses = await coursesClient.findMyCourses();
+      const courses = await coursesClient.findMyCourses(currentUser._id);
       if (Array.isArray(courses) && courses.length > 0) {
         dispatch(setMyCourses(courses));
         return;

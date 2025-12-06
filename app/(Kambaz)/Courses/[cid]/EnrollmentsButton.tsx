@@ -33,7 +33,7 @@ export default function EnrollmentsButton({ courseId }: Props) {
 
     // Try session-based endpoint first
     try {
-      const courses = await coursesClient.findMyCourses();
+      const courses = await coursesClient.findMyCourses(currentUser._id);
       if (Array.isArray(courses) && courses.length > 0) {
         dispatch(setMyCourses(courses));
         return;

@@ -2,7 +2,8 @@
 import axios from "axios";
 
 const axiosWithCredentials = axios.create({ withCredentials: true });
-const HTTP_SERVER = process.env.NEXT_PUBLIC_HTTP_SERVER;
+const HTTP_SERVER =
+  process.env.NEXT_PUBLIC_HTTP_SERVER || "http://localhost:4000";
 const COURSES_API = `${HTTP_SERVER}/api/courses`;
 const USERS_API = `${HTTP_SERVER}/api/users`;
 
@@ -12,11 +13,23 @@ export const fetchAllCourses = async () => {
   return data;
 };
 
-export const findMyCourses = async () => {
-  const { data } = await axiosWithCredentials.get(
-    `${USERS_API}/current/courses`
-  );
-  return data;
+export const findMyCourses = async (userId?: string) => {
+  try {
+    const { data } = await axiosWithCredentials.get(
+      `${USERS_API}/current/courses`
+    );
+    return data;
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (userId && status === 401) {
+      // Sessions vanish easily in development, so fall back to an explicit user id.
+      const { data } = await axios.get(
+        `${USERS_API}/${userId}/courses`
+      );
+      return data;
+    }
+    throw err;
+  }
 };
 
 export const createCourse = async (course: any) => {

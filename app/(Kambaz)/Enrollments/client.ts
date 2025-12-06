@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const HTTP_SERVER = process.env.NEXT_PUBLIC_HTTP_SERVER;
+const HTTP_SERVER =
+  process.env.NEXT_PUBLIC_HTTP_SERVER || "http://localhost:4000";
 const ENROLLMENTS_API = `${HTTP_SERVER}/api/enrollments`;
 
 export const findAllEnrollments = async () => {
