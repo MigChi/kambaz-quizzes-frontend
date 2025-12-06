@@ -528,17 +528,18 @@ export default function QuizPreviewPage() {
   const studentOutOfAttempts =
     isStudent && hasLoadedAttempts && attemptsRemaining <= 0;
 
+ 
   // === Access code requirement logic ===
-  const quizHasAccessCode =
-    !!loadedQuiz.accessCode && loadedQuiz.accessCode.trim().length > 0;
+  const quizAccessCode = (loadedQuiz?.accessCode ?? "").trim();
+  const quizHasAccessCode = quizAccessCode.length > 0;
 
-  const requiresAccessCodeForStudent =
-    isStudent && quizHasAccessCode;
+  const requiresAccessCodeForStudent = isStudent && quizHasAccessCode;
 
   const showAccessCodeGate =
     requiresAccessCodeForStudent &&
     mode === "TAKE_NEW_ATTEMPT" &&
     !accessCodeVerified;
+
 
   // Timer: reset whenever we start a new attempt (and timeLimit > 0),
   // BUT for students with an access code, only after it's verified.
@@ -971,7 +972,7 @@ export default function QuizPreviewPage() {
             <Form
               onSubmit={(e) => {
                 e.preventDefault();
-                const expected = (loadedQuiz.accessCode ?? "").trim();
+                const expected = quizAccessCode;
                 if (accessCodeInput.trim() === expected) {
                   setAccessCodeVerified(true);
                   setAccessCodeError(null);
