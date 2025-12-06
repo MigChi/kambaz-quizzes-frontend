@@ -48,12 +48,13 @@ export default function QuizDetailsPage() {
     load();
   }, [qid, quizFromStore]);
 
-  const isFaculty =
-    currentUser?.role === "FACULTY" || currentUser?.role === "ADMIN";
-  const isStudent = currentUser?.role === "STUDENT";
+  const role = currentUser?.role;
+  const isFaculty = role === "FACULTY" || role === "ADMIN";
+  const isStudent = role === "STUDENT";
+  const isTA = role === "TA";
 
   const onStartQuiz = () => {
-    // Placeholder behavior for now
+    // Placeholder for quiz-taking
     // eslint-disable-next-line no-alert
     alert("Starting quiz (placeholder)...");
   };
@@ -66,6 +67,15 @@ export default function QuizDetailsPage() {
     return <div className="text-muted">Quiz not found.</div>;
   }
 
+  // ⭐ Students cannot view unpublished quizzes, but TAs can
+  if (isStudent && !quiz.published) {
+    return (
+      <div className="text-muted">
+        This quiz is not available yet.
+      </div>
+    );
+  }
+
   return (
     <div
       id="wd-quiz-details"
@@ -74,27 +84,28 @@ export default function QuizDetailsPage() {
     >
       {/* Action buttons */}
       <div className="d-flex justify-content-end gap-2 mb-3">
+        {(isFaculty || isTA) && (
+          <Button
+            variant="secondary"
+            id="wd-quiz-preview-btn"
+            onClick={() =>
+              router.push(`/Courses/${cid}/Quizzes/${qid}/Preview`)
+            }
+          >
+            Preview
+          </Button>
+        )}
+
         {isFaculty && (
-          <>
-            <Button
-              variant="secondary"
-              id="wd-quiz-preview-btn"
-              onClick={() =>
-                router.push(`/Courses/${cid}/Quizzes/${qid}/Preview`)
-              }
-            >
-              Preview
-            </Button>
-            <Button
-              variant="danger"
-              id="wd-quiz-edit-btn"
-              onClick={() =>
-                router.push(`/Courses/${cid}/Quizzes/${qid}/Edit`)
-              }
-            >
-              Edit
-            </Button>
-          </>
+          <Button
+            variant="danger"
+            id="wd-quiz-edit-btn"
+            onClick={() =>
+              router.push(`/Courses/${cid}/Quizzes/${qid}/Edit`)
+            }
+          >
+            Edit
+          </Button>
         )}
 
         {isStudent && (

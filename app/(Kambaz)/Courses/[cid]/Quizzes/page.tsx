@@ -70,6 +70,7 @@ export default function QuizzesPage() {
 
   const isFaculty =
     currentUser?.role === "FACULTY" || currentUser?.role === "ADMIN";
+  const isStudent = currentUser?.role === "STUDENT";
 
   const [sortBy, setSortBy] = useState<
     "DEFAULT" | "TITLE" | "DUE" | "AVAILABLE"
@@ -90,8 +91,14 @@ export default function QuizzesPage() {
   }, [cid, dispatch]);
 
   const sortedQuizzes: Quiz[] = useMemo(() => {
-    const base = Array.isArray(quizzes) ? quizzes.filter(Boolean) : [];
-    const list = [...base];
+    const all = Array.isArray(quizzes) ? quizzes.filter(Boolean) : [];
+
+    // ⭐ STUDENT FILTER: students only see published quizzes
+    const visible = isStudent
+      ? all.filter((q) => q && q.published)
+      : all;
+
+    const list = [...visible];
 
     if (sortBy === "TITLE") {
       return list.sort((a, b) =>
@@ -121,7 +128,7 @@ export default function QuizzesPage() {
       });
     }
     return list;
-  }, [quizzes, sortBy]);
+  }, [quizzes, sortBy, isStudent]);
 
   const handleAddQuiz = async () => {
     if (!cid || !isFaculty) return;
@@ -151,7 +158,7 @@ export default function QuizzesPage() {
     try {
       const created = await client.createQuizForCourse(cid, defaultQuiz);
       dispatch(addQuiz(created));
-      // 👉 Go straight to the Editor screen
+      // faculty goes straight to editor for the new quiz
       router.push(`/Courses/${cid}/Quizzes/${created._id}/Edit`);
     } catch (e) {
       console.error("Failed to create quiz:", e);
@@ -227,7 +234,9 @@ export default function QuizzesPage() {
 
       {sortedQuizzes.length === 0 && (
         <p className="text-muted">
-          No quizzes yet. {isFaculty && "Click “+ Quiz” to add one."}
+          {isStudent
+            ? "No published quizzes are available yet."
+            : "No quizzes yet. Click “+ Quiz” to add one."}
         </p>
       )}
 
@@ -263,16 +272,24 @@ export default function QuizzesPage() {
                   <div className="col">
                     <div className="d-flex align-items-center gap-2">
                       {/* Published / Unpublished toggle */}
-                      <span
-                        role="button"
-                        aria-label={
-                          quiz.published ? "Unpublish quiz" : "Publish quiz"
-                        }
-                        onClick={() => handleTogglePublish(quiz)}
-                        className="me-1"
-                      >
-                        {quiz.published ? "✅" : "🚫"}
-                      </span>
+                      {isFaculty && (
+                        <span
+                          role="button"
+                          aria-label={
+                            quiz.published ? "Unpublish quiz" : "Publish quiz"
+                          }
+                          onClick={() => handleTogglePublish(quiz)}
+                          className="me-1"
+                        >
+                          {quiz.published ? "✅" : "🚫"}
+                        </span>
+                      )}
+
+                      {!isFaculty && (
+                        <span className="me-1">
+                          {quiz.published ? "✅" : "🚫"}
+                        </span>
+                      )}
 
                       {/* Title → Details screen */}
                       <Link
@@ -301,7 +318,7 @@ export default function QuizzesPage() {
                     </div>
                   </div>
 
-                  {/* Context menu */}
+                  {/* Context menu only for faculty */}
                   {isFaculty && (
                     <div className="col-auto">
                       <Dropdown align="end">
