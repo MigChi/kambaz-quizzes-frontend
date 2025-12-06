@@ -332,6 +332,7 @@ export default function QuizPreviewPage() {
 
   const role = currentUser?.role;
   const isStudent = role === "STUDENT";
+  const isTA = role === "TA";
   const isFaculty = role === "FACULTY" || role === "ADMIN";
   const isStaffPreview = !isStudent; // faculty or TA
 
@@ -592,28 +593,6 @@ export default function QuizPreviewPage() {
     router.push(`/Courses/${cid}/Quizzes/${qid}/Questions`);
   };
 
-  if (!loadedQuiz && isLoadingQuiz) {
-    return (
-      <div className="text-center text-muted py-5">
-        <Spinner animation="border" role="status" className="me-2" />
-        Loading quiz preview...
-      </div>
-    );
-  }
-
-  if (!loadedQuiz) {
-    return <div className="text-muted">Quiz not found.</div>;
-  }
-
-  // Students cannot access unpublished quizzes, but TAs & Faculty can
-  if (isStudent && !loadedQuiz.published) {
-    return (
-      <div className="text-muted">
-        This quiz is not available for students.
-      </div>
-    );
-  }
-
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
@@ -695,6 +674,30 @@ export default function QuizPreviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     handleSubmit();
   }, [mode, timeRemainingSeconds, hasAutoSubmitted]);
+
+  // 🔽 EARLY RETURNS COME AFTER ALL HOOKS 🔽
+
+  if (!loadedQuiz && isLoadingQuiz) {
+    return (
+      <div className="text-center text-muted py-5">
+        <Spinner animation="border" role="status" className="me-2" />
+        Loading quiz preview...
+      </div>
+    );
+  }
+
+  if (!loadedQuiz) {
+    return <div className="text-muted">Quiz not found.</div>;
+  }
+
+  // Students cannot access unpublished quizzes, but TAs & Faculty can
+  if (isStudent && !loadedQuiz.published) {
+    return (
+      <div className="text-muted">
+        This quiz is not available for students.
+      </div>
+    );
+  }
 
   const timeLimitMinutes =
     typeof loadedQuiz.timeLimit === "number" ? loadedQuiz.timeLimit : 0;
