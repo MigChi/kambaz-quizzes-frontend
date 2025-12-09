@@ -107,8 +107,12 @@ type QuizAttemptRecord = {
     questionId: string;
     answerType: QuestionType;
     selectedChoiceIds?: string[];
+    // Legacy single-selection shape (pre multi-answer). Keep for hydration.
+    selectedChoiceId?: string;
     trueFalseSelection?: "TRUE" | "FALSE";
     fillBlankResponses?: FillBlankResponse[];
+    // Legacy single response before multi-blank support.
+    fillBlankResponse?: string;
     isCorrect: boolean;
     earnedPoints: number;
   }[];
