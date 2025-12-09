@@ -28,11 +28,12 @@ type RootState = {
 };
 
 type PersistedChoice = {
+  id?: string;
   text?: string;
   correct?: boolean;
 };
 
-type PersistedBlank = string | { text?: string };
+type PersistedBlank = string | { id?: string; text?: string };
 
 type PersistedQuizQuestion = {
   _id?: string;
@@ -59,6 +60,16 @@ type MultipleChoiceOption = {
   isCorrect: boolean;
 };
 
+type FillBlankAnswer = {
+  id: string;
+  text: string;
+};
+
+type FillBlankResponse = {
+  blankId: string;
+  response: string;
+};
+
 type QuestionForPreview = {
   id: string;
   title: string;
@@ -67,15 +78,15 @@ type QuestionForPreview = {
   points: number;
   multipleChoiceOptions: MultipleChoiceOption[];
   trueFalseAnswer: "TRUE" | "FALSE";
-  acceptableFillBlankAnswers: string[];
+  fillBlankAnswers: FillBlankAnswer[];
 };
 
 type StudentAnswer = {
   questionId: string;
   answerType: QuestionType;
-  selectedChoiceId?: string;
+  selectedChoiceIds: string[];
   trueFalseSelection?: "TRUE" | "FALSE";
-  fillBlankResponse?: string;
+  fillBlankResponses: FillBlankResponse[];
 };
 
 type AnswerEvaluation = {
@@ -95,9 +106,9 @@ type QuizAttemptRecord = {
   answers: {
     questionId: string;
     answerType: QuestionType;
-    selectedChoiceId?: string;
+    selectedChoiceIds?: string[];
     trueFalseSelection?: "TRUE" | "FALSE";
-    fillBlankResponse?: string;
+    fillBlankResponses?: FillBlankResponse[];
     isCorrect: boolean;
     earnedPoints: number;
   }[];
@@ -132,7 +143,9 @@ const convertChoices = (
     ];
   }
   const mapped = choices.map((choice, index) => ({
-    id: generateStableId("choice"),
+    id:
+      (choice?.id && choice.id.toString()) ??
+      `choice-${index}`,
     text: choice?.text ?? `Choice ${index + 1}`,
     isCorrect: Boolean(choice?.correct),
   }));
@@ -151,16 +164,26 @@ const convertTrueFalseAnswer = (
   return answer === false ? "FALSE" : "TRUE";
 };
 
-const convertBlanks = (blanks?: PersistedBlank[]): string[] => {
+const convertBlanks = (blanks?: PersistedBlank[]): FillBlankAnswer[] => {
   if (!Array.isArray(blanks) || blanks.length === 0) {
     return [];
   }
   return blanks
-    .map((blank, index) =>
-      typeof blank === "string" ? blank : blank?.text ?? `Answer ${index + 1}`
-    )
-    .map((answer) => answer.trim())
-    .filter((answer) => answer.length > 0);
+    .map((blank, index) => {
+      const text =
+        typeof blank === "string"
+          ? blank
+          : blank?.text ?? `Answer ${index + 1}`;
+      const existingId =
+        typeof blank === "string"
+          ? null
+          : blank?.id?.toString?.() ?? null;
+      return {
+        id: existingId ?? `blank-${index}`,
+        text: text.trim(),
+      };
+    })
+    .filter((answer) => answer.text.length > 0);
 };
 
 const convertQuestionForPreview = (
@@ -185,7 +208,7 @@ const convertQuestionForPreview = (
     points: Number(question?.points ?? 0),
     multipleChoiceOptions: convertChoices(question?.choices),
     trueFalseAnswer: convertTrueFalseAnswer(question?.trueFalseAnswer),
-    acceptableFillBlankAnswers: convertBlanks(question?.blanks),
+    fillBlankAnswers: convertBlanks(question?.blanks),
   };
 };
 
@@ -206,9 +229,15 @@ const computeInitialAnswers = (
   questions.map((question) => ({
     questionId: question.id,
     answerType: question.questionType,
-    selectedChoiceId: undefined,
+    selectedChoiceIds: [],
     trueFalseSelection: undefined,
-    fillBlankResponse: "",
+    fillBlankResponses:
+      question.questionType === "FILL_BLANK"
+        ? question.fillBlankAnswers.map((blank) => ({
+            blankId: blank.id,
+            response: "",
+          }))
+        : [],
   }));
 
 const evaluateAnswers = (
@@ -225,19 +254,35 @@ const evaluateAnswers = (
 
     let isCorrect = false;
     if (question.questionType === "MULTIPLE_CHOICE") {
-      const selected = question.multipleChoiceOptions.find(
-        (option) => option.id === answer.selectedChoiceId
-      );
-      isCorrect = Boolean(selected?.isCorrect);
+      const selectedIds = new Set(answer.selectedChoiceIds ?? []);
+      const correctIds = question.multipleChoiceOptions
+        .filter((option) => option.isCorrect)
+        .map((option) => option.id);
+      if (correctIds.length === 0) {
+        isCorrect = selectedIds.size === 0;
+      } else {
+        isCorrect =
+          selectedIds.size === correctIds.length &&
+          correctIds.every((id) => selectedIds.has(id));
+      }
     } else if (question.questionType === "TRUE_FALSE") {
       isCorrect = answer.trueFalseSelection === question.trueFalseAnswer;
     } else {
-      const studentResponse = (answer.fillBlankResponse ?? "")
-        .trim()
-        .toLowerCase();
-      isCorrect = question.acceptableFillBlankAnswers.some(
-        (acceptable) => acceptable.trim().toLowerCase() === studentResponse
-      );
+      const responses = answer.fillBlankResponses ?? [];
+      if (responses.length !== question.fillBlankAnswers.length) {
+        isCorrect = false;
+      } else {
+        isCorrect = question.fillBlankAnswers.every((blank) => {
+          const provided = responses.find(
+            (resp) => resp.blankId === blank.id
+          );
+          if (!provided) return false;
+          return (
+            (provided.response ?? "").trim().toLowerCase() ===
+            blank.text.trim().toLowerCase()
+          );
+        });
+      }
     }
 
     return {
@@ -268,12 +313,16 @@ const isQuestionAnswered = (
 ): boolean => {
   if (!answer) return false;
   if (question.questionType === "MULTIPLE_CHOICE") {
-    return !!answer.selectedChoiceId;
+    return !!answer.selectedChoiceIds?.length;
   }
   if (question.questionType === "TRUE_FALSE") {
     return !!answer.trueFalseSelection;
   }
-  return !!answer.fillBlankResponse && answer.fillBlankResponse.trim().length > 0;
+  const blanks = answer.fillBlankResponses ?? [];
+  if (blanks.length === 0) return false;
+  return blanks.every(
+    (blank) => !!blank.response && blank.response.trim().length > 0
+  );
 };
 
 export default function QuizPreviewPage() {
@@ -390,19 +439,46 @@ export default function QuizPreviewPage() {
         return {
           questionId: question.id,
           answerType: question.questionType,
-          selectedChoiceId: undefined,
+          selectedChoiceIds: [],
           trueFalseSelection: undefined,
-          fillBlankResponse: "",
+          fillBlankResponses:
+            question.questionType === "FILL_BLANK"
+              ? question.fillBlankAnswers.map((blank) => ({
+                  blankId: blank.id,
+                  response: "",
+                }))
+              : [],
         };
       }
       return {
         questionId: question.id,
         answerType: stored.answerType as QuestionType,
-        selectedChoiceId: stored.selectedChoiceId,
+        selectedChoiceIds: Array.isArray(stored.selectedChoiceIds)
+          ? stored.selectedChoiceIds
+          : stored.selectedChoiceIds
+          ? [stored.selectedChoiceIds]
+          : stored.selectedChoiceId
+          ? [stored.selectedChoiceId]
+          : [],
         trueFalseSelection:
           (stored.trueFalseSelection as "TRUE" | "FALSE" | undefined) ??
           undefined,
-        fillBlankResponse: stored.fillBlankResponse ?? "",
+        fillBlankResponses:
+          question.questionType === "FILL_BLANK"
+            ? question.fillBlankAnswers.map((blank, blankIndex) => {
+                const existing = stored.fillBlankResponses?.find(
+                  (resp) => resp.blankId === blank.id
+                );
+                return {
+                  blankId: blank.id,
+                  response:
+                    existing?.response ??
+                    (blankIndex === 0
+                      ? stored.fillBlankResponse ?? ""
+                      : ""),
+                };
+              })
+            : [],
       };
     });
 
@@ -586,13 +662,24 @@ export default function QuizPreviewPage() {
     return () => clearInterval(intervalId);
   }, [timeRemainingSeconds]);
 
-  const handleSelectChoice = (questionId: string, choiceId: string) => {
+  const handleToggleChoiceSelection = (
+    questionId: string,
+    choiceId: string
+  ) => {
     setStudentAnswers((previous) =>
-      previous.map((answer) =>
-        answer.questionId === questionId
-          ? { ...answer, selectedChoiceId: choiceId }
-          : answer
-      )
+      previous.map((answer) => {
+        if (answer.questionId !== questionId) return answer;
+        const currentIds = new Set(answer.selectedChoiceIds ?? []);
+        if (currentIds.has(choiceId)) {
+          currentIds.delete(choiceId);
+        } else {
+          currentIds.add(choiceId);
+        }
+        return {
+          ...answer,
+          selectedChoiceIds: Array.from(currentIds),
+        };
+      })
     );
   };
 
@@ -609,13 +696,31 @@ export default function QuizPreviewPage() {
     );
   };
 
-  const handleFillBlankResponse = (questionId: string, response: string) => {
+  const handleFillBlankResponse = (
+    questionId: string,
+    blankId: string,
+    response: string
+  ) => {
     setStudentAnswers((previous) =>
-      previous.map((answer) =>
-        answer.questionId === questionId
-          ? { ...answer, fillBlankResponse: response }
-          : answer
-      )
+      previous.map((answer) => {
+        if (answer.questionId !== questionId) return answer;
+        const nextResponses = [...(answer.fillBlankResponses ?? [])];
+        const existingIndex = nextResponses.findIndex(
+          (blank) => blank.blankId === blankId
+        );
+        if (existingIndex >= 0) {
+          nextResponses[existingIndex] = {
+            ...nextResponses[existingIndex],
+            response,
+          };
+        } else {
+          nextResponses.push({ blankId, response });
+        }
+        return {
+          ...answer,
+          fillBlankResponses: nextResponses,
+        };
+      })
     );
   };
 
@@ -674,9 +779,20 @@ export default function QuizPreviewPage() {
           return {
             questionId: question.id,
             answerType: question.questionType,
-            selectedChoiceId: ans?.selectedChoiceId,
+            selectedChoiceIds: ans?.selectedChoiceIds ?? [],
             trueFalseSelection: ans?.trueFalseSelection,
-            fillBlankResponse: ans?.fillBlankResponse ?? "",
+            fillBlankResponses:
+              question.questionType === "FILL_BLANK"
+                ? question.fillBlankAnswers.map((blank) => {
+                    const resp = ans?.fillBlankResponses?.find(
+                      (entry) => entry.blankId === blank.id
+                    );
+                    return {
+                      blankId: blank.id,
+                      response: resp?.response ?? "",
+                    };
+                  })
+                : [],
             isCorrect: evalResult?.isCorrect ?? false,
             earnedPoints: evalResult?.earnedPoints ?? 0,
           };
@@ -1059,23 +1175,30 @@ export default function QuizPreviewPage() {
 
                       {question.questionType === "MULTIPLE_CHOICE" && (
                         <Form>
-                          {question.multipleChoiceOptions.map((option) => (
-                            <Form.Check
-                              type="radio"
-                              name={`question-${question.id}`}
-                              key={option.id}
-                              label={option.text}
-                              checked={
-                                studentAnswer?.selectedChoiceId === option.id
-                              }
-                              onChange={() =>
-                                !readOnlyForQuestion &&
-                                handleSelectChoice(question.id, option.id)
-                              }
-                              disabled={readOnlyForQuestion}
-                              className="mb-2"
-                            />
-                          ))}
+                          {question.multipleChoiceOptions.map((option) => {
+                            const isChecked =
+                              studentAnswer?.selectedChoiceIds?.includes(
+                                option.id
+                              ) ?? false;
+                            return (
+                              <Form.Check
+                                type="checkbox"
+                                name={`question-${question.id}-${option.id}`}
+                                key={option.id}
+                                label={option.text}
+                                checked={isChecked}
+                                onChange={() =>
+                                  !readOnlyForQuestion &&
+                                  handleToggleChoiceSelection(
+                                    question.id,
+                                    option.id
+                                  )
+                                }
+                                disabled={readOnlyForQuestion}
+                                className="mb-2"
+                              />
+                            );
+                          })}
                         </Form>
                       )}
 
@@ -1113,20 +1236,34 @@ export default function QuizPreviewPage() {
                       )}
 
                       {question.questionType === "FILL_BLANK" && (
-                        <Form.Group>
-                          <Form.Control
-                            placeholder="Type your answer"
-                            value={studentAnswer?.fillBlankResponse ?? ""}
-                            onChange={(event) =>
-                              !readOnlyForQuestion &&
-                              handleFillBlankResponse(
-                                question.id,
-                                event.target.value
-                              )
-                            }
-                            disabled={readOnlyForQuestion}
-                          />
-                        </Form.Group>
+                        <div>
+                          {question.fillBlankAnswers.map((blank, blankIndex) => {
+                            const response =
+                              studentAnswer?.fillBlankResponses?.find(
+                                (entry) => entry.blankId === blank.id
+                              )?.response ?? "";
+                            return (
+                              <Form.Group className="mb-3" key={blank.id}>
+                                <Form.Label className="small fw-semibold">
+                                  Blank {blankIndex + 1}
+                                </Form.Label>
+                                <Form.Control
+                                  placeholder="Type your answer"
+                                  value={response}
+                                  onChange={(event) =>
+                                    !readOnlyForQuestion &&
+                                    handleFillBlankResponse(
+                                      question.id,
+                                      blank.id,
+                                      event.target.value
+                                    )
+                                  }
+                                  disabled={readOnlyForQuestion}
+                                />
+                              </Form.Group>
+                            );
+                          })}
+                        </div>
                       )}
 
                       {evaluation && (
@@ -1148,8 +1285,14 @@ export default function QuizPreviewPage() {
                                 ? question.trueFalseAnswer === "TRUE"
                                   ? "True"
                                   : "False"
-                                : question.acceptableFillBlankAnswers.join(", ") ||
-                                  "—"}
+                                : question.fillBlankAnswers.length
+                                ? question.fillBlankAnswers
+                                    .map(
+                                      (blank, blankIndex) =>
+                                        `Blank ${blankIndex + 1}: ${blank.text}`
+                                    )
+                                    .join("; ")
+                                : "—"}
                             </div>
                           )}
                         </div>

@@ -3,9 +3,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Button } from "react-bootstrap";
 import * as client from "../client";
+import { updateQuiz } from "../reducer";
 
 type RootState = any;
 
@@ -13,11 +14,13 @@ export default function QuizDetailsPage() {
   const router = useRouter();
   const { cid, qid } = useParams<{ cid: string; qid: string }>();
 
+  const dispatch = useDispatch();
   const { quizzes } = useSelector((s: RootState) => s.quizzesReducer);
   const { currentUser } = useSelector((s: RootState) => s.accountReducer);
 
   const [localQuiz, setLocalQuiz] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const [attemptsInfo, setAttemptsInfo] = useState<{
     attemptsCount: number;
@@ -124,6 +127,23 @@ export default function QuizDetailsPage() {
     router.push(`/Courses/${cid}/Quizzes/${qid}/Preview?mode=review`);
   };
 
+  const onTogglePublish = async () => {
+    if (!quiz || !quiz._id || !isFaculty) return;
+    try {
+      setPublishing(true);
+      const updated = await client.updateQuiz({
+        ...quiz,
+        published: !quiz.published,
+      });
+      setLocalQuiz(updated);
+      dispatch(updateQuiz(updated));
+    } catch (err) {
+      console.error("Failed to toggle publish state:", err);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
 
 
   if (loading && !quiz) {
@@ -164,15 +184,29 @@ export default function QuizDetailsPage() {
         )}
 
         {isFaculty && (
-          <Button
-            variant="danger"
-            id="wd-quiz-edit-btn"
-            onClick={() =>
-              router.push(`/Courses/${cid}/Quizzes/${qid}/Edit`)
-            }
-          >
-            Edit
-          </Button>
+          <>
+            <Button
+              variant={quiz.published ? "outline-secondary" : "success"}
+              id="wd-quiz-publish-btn"
+              onClick={onTogglePublish}
+              disabled={publishing}
+            >
+              {publishing
+                ? "Saving..."
+                : quiz.published
+                ? "Unpublish"
+                : "Publish"}
+            </Button>
+            <Button
+              variant="danger"
+              id="wd-quiz-edit-btn"
+              onClick={() =>
+                router.push(`/Courses/${cid}/Quizzes/${qid}/Edit`)
+              }
+            >
+              Edit
+            </Button>
+          </>
         )}
 
         {isStudent && (
@@ -252,7 +286,9 @@ export default function QuizDetailsPage() {
 
         <dt className="col-sm-4">Time Limit</dt>
         <dd className="col-sm-8">
-          {quiz.timeLimit ?? 20} Minutes
+          {quiz.timeLimit && quiz.timeLimit > 0
+            ? `${quiz.timeLimit} Minutes`
+            : "No time limit"}
         </dd>
 
         <dt className="col-sm-4">Multiple Attempts</dt>

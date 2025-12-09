@@ -102,6 +102,9 @@ export default function QuizEditorPage() {
         }
       : defaultForm(cid)
   );
+  const [timeLimitEnabled, setTimeLimitEnabled] = useState<boolean>(() =>
+    (existing?.timeLimit ?? defaultForm(cid).timeLimit ?? 0) > 0
+  );
 
   // If direct nav, reload the quiz from server
   useEffect(() => {
@@ -146,6 +149,7 @@ export default function QuizEditorPage() {
       availableUntil: existing.availableUntil ?? prev.availableUntil,
       published: existing.published ?? prev.published,
     }));
+    setTimeLimitEnabled((existing.timeLimit ?? 0) > 0);
   }, [existing, cid]);
 
   const quizId = form._id ?? qid;
@@ -161,7 +165,7 @@ export default function QuizEditorPage() {
     const payload = {
       ...merged,
       points: Number(merged.points) || 0,
-      timeLimit: Number(merged.timeLimit) || 0,
+      timeLimit: timeLimitEnabled ? Number(merged.timeLimit) || 0 : 0,
       allowedAttempts: Number(merged.allowedAttempts) || 1,
     };
 
@@ -336,11 +340,30 @@ export default function QuizEditorPage() {
             <Form.Label>Time Limit</Form.Label>
           </Col>
           <Col sm={8}>
+            <Form.Check
+              type="checkbox"
+              id="wd-quiz-time-limit-enabled"
+              label="Enforce time limit"
+              className="mb-2"
+              checked={timeLimitEnabled}
+              disabled={readOnly}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setTimeLimitEnabled(enabled);
+                if (enabled && (!form.timeLimit || form.timeLimit <= 0)) {
+                  setForm({ ...form, timeLimit: 20 });
+                }
+                if (!enabled) {
+                  setForm({ ...form, timeLimit: 0 });
+                }
+              }}
+            />
             <InputGroup style={{ maxWidth: 260 }}>
               <Form.Control
                 type="number"
-                value={form.timeLimit}
-                disabled={readOnly}
+                min={1}
+                value={form.timeLimit ?? 0}
+                disabled={readOnly || !timeLimitEnabled}
                 onChange={(e) =>
                   setForm({
                     ...form,

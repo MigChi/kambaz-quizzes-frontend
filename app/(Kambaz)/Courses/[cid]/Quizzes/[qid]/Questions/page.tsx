@@ -56,7 +56,7 @@ type PersistedChoice = {
   correct?: boolean;
 };
 
-type PersistedBlank = string | { text?: string };
+type PersistedBlank = string | { id?: string; text?: string };
 
 type PersistedQuizQuestion = {
   _id?: string;
@@ -94,9 +94,10 @@ const createDefaultMultipleChoiceOption = (
 });
 
 const createDefaultFillBlankAnswer = (
-  text = ""
+  text = "",
+  forcedId?: string
 ): FillBlankAnswer => ({
-  id: generateStableId("blank"),
+  id: forcedId ?? generateStableId("blank"),
   text,
 });
 
@@ -160,7 +161,8 @@ const convertPersistedBlanksToForm = (
       typeof answer === "string"
         ? answer
         : answer?.text ?? `Answer ${index + 1}`;
-    return createDefaultFillBlankAnswer(text);
+    const existingId = typeof answer === "string" ? undefined : answer?.id;
+    return createDefaultFillBlankAnswer(text, existingId);
   });
 };
 
@@ -227,6 +229,7 @@ const convertQuestionFormStateForPersistence = (
   choices:
     question.questionType === "MULTIPLE_CHOICE"
       ? question.multipleChoiceOptions.map((option) => ({
+          id: option.id,
           text: option.text,
           correct: option.isCorrect,
         }))
@@ -238,8 +241,11 @@ const convertQuestionFormStateForPersistence = (
   blanks:
     question.questionType === "FILL_BLANK"
       ? question.fillBlankAnswers
-          .map((answer) => answer.text.trim())
-          .filter((text) => text.length > 0)
+          .map((answer) => ({
+            id: answer.id,
+            text: answer.text.trim(),
+          }))
+          .filter((answer) => answer.text.length > 0)
       : undefined,
 });
 
@@ -488,14 +494,23 @@ export default function QuizQuestionsEditorPage() {
       ),
     }));
 
-  const handleChoiceCorrectSelection = (questionId: string, choiceId: string) =>
-    handleUpdateQuestionField(questionId, (current) => ({
+const handleChoiceCorrectToggle = (
+  questionId: string,
+  choiceId: string,
+  nextValue: boolean
+) =>
+  handleUpdateQuestionField(questionId, (current) => {
+    const updated = current.multipleChoiceOptions.map((option) =>
+      option.id === choiceId ? { ...option, isCorrect: nextValue } : option
+    );
+    if (!updated.some((option) => option.isCorrect)) {
+      return current;
+    }
+    return {
       ...current,
-      multipleChoiceOptions: current.multipleChoiceOptions.map((option) => ({
-        ...option,
-        isCorrect: option.id === choiceId,
-      })),
-    }));
+      multipleChoiceOptions: updated,
+    };
+  });
 
   const handleAddChoiceToQuestion = (questionId: string) =>
     handleUpdateQuestionField(questionId, (current) => ({
@@ -792,13 +807,14 @@ export default function QuizQuestionsEditorPage() {
                       <InputGroup className="mb-2" key={choice.id}>
                         <InputGroup.Text>
                           <Form.Check
-                            type="radio"
-                            name={`correct-${question.localId}`}
+                            type="checkbox"
+                            name={`correct-${question.localId}-${choice.id}`}
                             checked={choice.isCorrect}
-                            onChange={() =>
-                              handleChoiceCorrectSelection(
+                            onChange={(event) =>
+                              handleChoiceCorrectToggle(
                                 question.localId,
-                                choice.id
+                                choice.id,
+                                event.target.checked
                               )
                             }
                           />
